@@ -24,14 +24,16 @@ export default function AdminWaterwaysPage() {
 
   async function loadData() {
     try {
-      const [{ data: jData }, { data: eData }] = await Promise.all([
-        fetch('/api/admin/jetties').then((r) => r.json()),
-        fetch('/api/admin/water-edges').then((r) => r.json()),
+      const [jRes, eRes] = await Promise.all([
+        fetch('/api/admin/jetties'),
+        fetch('/api/admin/water-edges'),
       ]);
-      setJetties(jData.jetties || []);
-      setEdges(eData.edges || []);
+      const jData = await jRes.json();
+      const eData = await eRes.json();
+      setJetties(jData?.jetties || []);
+      setEdges(eData?.edges || []);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load waterways data:', err);
     } finally {
       setLoading(false);
     }

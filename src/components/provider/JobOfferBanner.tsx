@@ -17,6 +17,7 @@ interface JobOfferBannerProps {
   offer: OfferBannerData | null;
   onAccept: (jobId: string) => Promise<void>;
   onDismiss: () => void;
+  onDecline?: (jobId: string) => Promise<void> | void;
   loading: boolean;
 }
 
@@ -24,6 +25,7 @@ export default function JobOfferBanner({
   offer,
   onAccept,
   onDismiss,
+  onDecline,
   loading,
 }: JobOfferBannerProps) {
   useEffect(() => {
@@ -74,7 +76,13 @@ export default function JobOfferBanner({
           <button
             type="button"
             disabled={loading}
-            onClick={onDismiss}
+            onClick={() => {
+              if (onDecline) {
+                onDecline(offer.jobId);
+              } else {
+                onDismiss();
+              }
+            }}
             className="px-3 py-2 rounded-lg bg-black/20 hover:bg-black/30 text-white font-medium text-xs transition-colors"
           >
             Decline ✕

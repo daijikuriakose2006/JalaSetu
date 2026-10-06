@@ -6,12 +6,14 @@ import type { Job } from '@/lib/types/database';
 interface RequestsTabProps {
   requests: (Job & { orders?: any })[];
   onAccept: (jobId: string) => Promise<void>;
+  onDecline?: (jobId: string) => Promise<void>;
   loading: boolean;
 }
 
 export default function RequestsTab({
   requests,
   onAccept,
+  onDecline,
   loading,
 }: RequestsTabProps) {
   const [claimingId, setClaimingId] = useState<string | null>(null);
@@ -26,8 +28,19 @@ export default function RequestsTab({
     }
   };
 
-  const handleDecline = (jobId: string) => {
+  const handleDecline = async (jobId: string) => {
+    // Optimistically hide from view immediately
     setDeclinedIds((prev) => new Set([...prev, jobId]));
+
+    try {
+      if (onDecline) {
+        await onDecline(jobId);
+      } else {
+        await fetch(`/api/jobs/${jobId}/decline`, { method: 'POST' });
+      }
+    } catch (err) {
+      console.warn('Decline request error:', err);
+    }
   };
 
   const visibleRequests = requests.filter((r) => !declinedIds.has(r.id));

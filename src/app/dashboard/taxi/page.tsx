@@ -104,6 +104,16 @@ export default function TaxiDashboard({ initialTab = 'map' }: TaxiDashboardProps
     setActiveTab('jobs');
   };
 
+  const handleDeclineJob = async (jobId: string) => {
+    setIncomingOffer((prev) => (prev?.jobId === jobId ? null : prev));
+    setRequests((prev) => prev.filter((r) => r.id !== jobId));
+    try {
+      await fetch(`/api/jobs/${jobId}/decline`, { method: 'POST' });
+    } catch (err) {
+      console.warn('Decline job error:', err);
+    }
+  };
+
   const handleUpdateStatus = async (jobId: string, nextStatus: string) => {
     const res = await fetch(`/api/jobs/${jobId}/status`, {
       method: 'PATCH',
@@ -138,6 +148,7 @@ export default function TaxiDashboard({ initialTab = 'map' }: TaxiDashboardProps
       <JobOfferBanner
         offer={incomingOffer}
         onAccept={handleClaimJob}
+        onDecline={handleDeclineJob}
         onDismiss={() => setIncomingOffer(null)}
         loading={false}
       />
@@ -241,6 +252,7 @@ export default function TaxiDashboard({ initialTab = 'map' }: TaxiDashboardProps
         <RequestsTab
           requests={requests}
           onAccept={handleClaimJob}
+          onDecline={handleDeclineJob}
           loading={loading}
         />
       </div>

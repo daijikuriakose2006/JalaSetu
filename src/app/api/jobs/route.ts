@@ -48,10 +48,16 @@ export async function GET(request: Request) {
     const { data: jobs, error } = await query;
     if (error) throw error;
 
-    // Filter requests in JS if not mineOnly to include offered_to OR queued orders OR open pool
+    // Filter requests in JS if not mineOnly to include offered_to OR queued orders OR open pool (excluding declined)
     let result = (jobs || []) as (Job & { orders: Order })[];
     if (!mineOnly) {
       result = result.filter((j) => {
+        // Exclude if previously declined by this user
+        const hasDeclined =
+          Array.isArray(j.status_history) &&
+          j.status_history.some((h: any) => h.status === 'declined' && h.by === user.id);
+        if (hasDeclined) return false;
+
         const isOffered = Array.isArray(j.offered_to) && j.offered_to.includes(user.id);
         const isOpenPool = !j.offered_to || (Array.isArray(j.offered_to) && j.offered_to.length === 0);
         const isQueued = j.orders?.status === 'queued';
