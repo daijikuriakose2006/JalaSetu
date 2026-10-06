@@ -38,6 +38,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { label: 'Map', href: '/dashboard/ship-owner', icon: '🗺️' },
     { label: 'My Jobs', href: '/dashboard/ship-owner/jobs', icon: '⚓' },
     { label: 'Requests', href: '/dashboard/ship-owner/requests', icon: '📨' },
+    { label: 'Preferences', href: '/dashboard/ship-owner/preferences', icon: '⚙️' },
     { label: 'Boats', href: '/dashboard/ship-owner/boats', icon: '🚢' },
     { label: 'Profile', href: '/dashboard/ship-owner/profile', icon: '👤' },
   ],
@@ -45,12 +46,14 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { label: 'Map', href: '/dashboard/worker', icon: '🗺️' },
     { label: 'My Jobs', href: '/dashboard/worker/jobs', icon: '💪' },
     { label: 'Requests', href: '/dashboard/worker/requests', icon: '📨' },
+    { label: 'Preferences', href: '/dashboard/worker/preferences', icon: '⚙️' },
     { label: 'Profile', href: '/dashboard/worker/profile', icon: '👤' },
   ],
   taxi: [
     { label: 'Map', href: '/dashboard/taxi', icon: '🗺️' },
     { label: 'My Jobs', href: '/dashboard/taxi/jobs', icon: '🚛' },
     { label: 'Requests', href: '/dashboard/taxi/requests', icon: '📨' },
+    { label: 'Preferences', href: '/dashboard/taxi/preferences', icon: '⚙️' },
     { label: 'Profile', href: '/dashboard/taxi/profile', icon: '👤' },
   ],
   admin: [

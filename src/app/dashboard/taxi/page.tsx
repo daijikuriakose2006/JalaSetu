@@ -5,16 +5,17 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import ProviderMapTab from '@/components/provider/ProviderMapTab';
 import MyJobsTab from '@/components/provider/MyJobsTab';
 import RequestsTab from '@/components/provider/RequestsTab';
+import PreferencesTab from '@/components/provider/PreferencesTab';
 import JobOfferBanner, { type OfferBannerData } from '@/components/provider/JobOfferBanner';
 import type { Job } from '@/lib/types/database';
 
 interface TaxiDashboardProps {
-  initialTab?: 'map' | 'jobs' | 'requests';
+  initialTab?: 'map' | 'jobs' | 'requests' | 'preferences';
 }
 
 export default function TaxiDashboard({ initialTab = 'map' }: TaxiDashboardProps) {
   const { profile, refreshProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'map' | 'jobs' | 'requests'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'map' | 'jobs' | 'requests' | 'preferences'>(initialTab);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -202,6 +203,15 @@ export default function TaxiDashboard({ initialTab = 'map' }: TaxiDashboardProps
                 </span>
               )}
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('preferences')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'preferences' ? 'bg-accent text-white shadow-xs' : 'text-secondary hover:text-primary'
+              }`}
+            >
+              ⚙️ Preferences
+            </button>
           </div>
         </div>
       </div>
@@ -233,6 +243,10 @@ export default function TaxiDashboard({ initialTab = 'map' }: TaxiDashboardProps
           onAccept={handleClaimJob}
           loading={loading}
         />
+      </div>
+
+      <div className={activeTab === 'preferences' ? 'block' : 'hidden'}>
+        <PreferencesTab role="taxi" />
       </div>
     </div>
   );
