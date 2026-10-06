@@ -24,14 +24,15 @@ export default function BoatsManagementPage() {
   async function loadBoatsAndJetties() {
     if (!user) return;
     try {
+      const client = supabase as any;
       const [{ data: bData }, { data: jData }] = await Promise.all([
-        supabase.from('boats').select('*').eq('owner_id', user.id),
-        supabase.from('jetties').select('*').eq('is_active', true),
+        client.from('boats').select('*').eq('owner_id', user.id),
+        client.from('jetties').select('*').eq('is_active', true),
       ]);
       setBoats((bData as Boat[]) || []);
       setJetties((jData as Jetty[]) || []);
       if (jData && jData.length > 0 && !homeJettyId) {
-        setHomeJettyId(jData[0].id);
+        setHomeJettyId((jData[0] as any).id);
       }
     } catch (err) {
       console.warn(err);
@@ -50,7 +51,8 @@ export default function BoatsManagementPage() {
     setSubmitting(true);
 
     try {
-      const { error } = await supabase.from('boats').insert({
+      const client = supabase as any;
+      const { error } = await client.from('boats').insert({
         owner_id: user.id,
         name,
         capacity_t: Number(capacityT),

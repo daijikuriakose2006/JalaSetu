@@ -25,7 +25,7 @@ export async function POST(
     // Try calling the atomic Postgres RPC function first
     let claimed = false;
     try {
-      const { data: rpcResult, error: rpcError } = await supabase.rpc('claim_job', {
+      const { data: rpcResult, error: rpcError } = await (supabase as any).rpc('claim_job', {
         p_job_id: id,
       });
       if (!rpcError && typeof rpcResult === 'boolean') {

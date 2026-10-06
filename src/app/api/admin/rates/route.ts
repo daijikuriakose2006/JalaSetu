@@ -43,7 +43,7 @@ export async function PATCH(request: Request) {
     }
 
     const admin = createAdminClient();
-    const updatedRates = [];
+    const updatedRates: any[] = [];
 
     for (const r of rates) {
       if (r.key && r.value !== undefined) {
