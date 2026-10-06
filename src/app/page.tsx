@@ -2,17 +2,44 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
+// Lazy-load animated boat only on the landing hero
+const HeroBoatCanvas = dynamic(() => import('@/components/landing/HeroBoatCanvas'), {
+  ssr: false,
+  loading: () => <div className="h-28 flex items-center justify-center text-xs text-secondary">Loading vessel animation...</div>,
+});
+
 export default function HomePage() {
+  const [demoWeight, setDemoWeight] = useState(8);
   const [contactForm, setContactForm] = useState({
     name: '',
     email: '',
+    subject: '',
     message: '',
   });
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [contactError, setContactError] = useState('');
+
+  // Interactive Live Road vs Water calculations for Kochi -> Alappuzha
+  // Road: 65 km via NH66 @ ₹6/tonne-km
+  const roadCost = Math.round(6.0 * 65 * demoWeight);
+  const roadDurationHours = 2.5;
+  const roadCo2Kg = Number((0.062 * 65 * demoWeight).toFixed(1));
+
+  // Waterway: 80 km backwaters @ ₹3.5/tonne-km + loading ₹150/t * 2
+  const waterFreight = 3.5 * 80 * demoWeight;
+  const waterLoading = 150 * demoWeight * 2;
+  const waterCost = Math.round(waterFreight + waterLoading);
+  const waterDurationHours = 4.5;
+  const waterCo2Kg = Number((0.016 * 80 * demoWeight).toFixed(1));
+
+  const costSaved = Math.max(0, roadCost - waterCost);
+  const costSavedPercent = roadCost > 0 ? Math.round((costSaved / roadCost) * 100) : 0;
+  const co2SavedKg = Number(Math.max(0, roadCo2Kg - waterCo2Kg).toFixed(1));
+  const co2SavedPercent = roadCo2Kg > 0 ? Math.round((co2SavedKg / roadCo2Kg) * 100) : 0;
 
   const handleContact = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,263 +47,318 @@ export default function HomePage() {
     setContactError('');
 
     try {
-      const formData = new FormData();
-      formData.append('access_key', '95c467f9-9a1c-42d2-b0f9-ad073b20a45b');
-      formData.append('name', contactForm.name);
-      formData.append('email', contactForm.email);
-      formData.append('message', contactForm.message);
-      formData.append('subject', 'New Contact from JalaSetu');
-
-      const response = await fetch('https://api.web3forms.com/submit', {
+      const res = await fetch('/api/contact', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(contactForm),
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (res.ok) {
         setSent(true);
-        setContactForm({ name: '', email: '', message: '' });
+        setContactForm({ name: '', email: '', subject: '', message: '' });
       } else {
-        setContactError(data.message || 'Failed to send. Please try again.');
+        const data = await res.json();
+        setContactError(data.error || 'Failed to submit. Please try again.');
       }
     } catch {
-      setContactError('Something went wrong. Please try again.');
+      setContactError('Network error. Please try again.');
     } finally {
       setSending(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-main">
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 bg-surface/80 backdrop-blur-sm border-b border-default">
+    <div className="min-h-screen bg-main flex flex-col">
+      {/* Top Navbar */}
+      <nav className="sticky top-0 z-50 bg-surface/85 backdrop-blur-md border-b border-default">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold text-accent flex items-center gap-2">
-            🚢 JalaSetu
+            <span>🚢</span> JalaSetu
           </Link>
-          <div className="hidden md:flex items-center gap-6 text-sm text-secondary">
-            <a href="#how-it-works" className="hover:text-accent transition-colors">How it Works</a>
-            <a href="#features" className="hover:text-accent transition-colors">Features</a>
-            <a href="#comparison" className="hover:text-accent transition-colors">Compare</a>
+
+          <div className="hidden md:flex items-center gap-6 text-xs font-semibold text-secondary">
+            <a href="#how-it-works" className="hover:text-accent transition-colors">How It Works</a>
+            <a href="#comparison" className="hover:text-accent transition-colors">Road vs Water</a>
+            <a href="#features" className="hover:text-accent transition-colors">Stakeholders</a>
+            <a href="#faq" className="hover:text-accent transition-colors">FAQ</a>
             <a href="#contact" className="hover:text-accent transition-colors">Contact</a>
           </div>
+
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <Link href="/login" className="btn btn-secondary text-sm">
+            <Link href="/login" className="btn btn-secondary text-xs">
               Sign In
             </Link>
-            <Link href="/signup" className="btn btn-primary text-sm hidden sm:inline-flex">
+            <Link href="/signup" className="btn btn-primary text-xs hidden sm:inline-flex">
               Get Started
             </Link>
           </div>
         </div>
       </nav>
 
-      {/* Hero */}
-      <section className="max-w-6xl mx-auto px-4 py-16 md:py-24">
-        <div className="text-center max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent-light text-accent text-sm font-medium mb-6">
-            🌊 Kerala&apos;s First Inland Water Transport Marketplace
+      {/* Hero Section */}
+      <section className="max-w-6xl mx-auto px-4 py-16 md:py-20 text-center">
+        <div className="max-w-3xl mx-auto space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent-light text-accent text-xs font-bold tracking-wide uppercase">
+            🌊 Kerala&apos;s Inland Waterway Freight Marketplace
           </div>
-          <h1 className="text-3xl md:text-5xl font-bold text-primary leading-tight mb-6">
-            Move Cargo Through
-            <span className="text-accent"> Kerala&apos;s Backwaters</span>
+
+          <h1 className="text-3xl md:text-5xl font-black text-primary leading-tight">
+            Connect Cargo with Kerala&apos;s
+            <span className="text-accent"> Backwaters</span>
           </h1>
-          <p className="text-lg text-secondary mb-8 max-w-2xl mx-auto">
-            Connect with boat operators, compare road vs waterway transport, and
-            save up to 40% on costs while cutting CO₂ emissions by 74%.
+
+          <p className="text-base text-secondary max-w-2xl mx-auto leading-relaxed">
+            Move heavy commercial freight through National Waterway 3. Compare direct road trucks vs multi-modal barges on
+            <strong> cost, time, and CO₂</strong>, with automatic dispatch for boats, taxis, and loading crews.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/signup" className="btn btn-primary text-base px-8 py-3">
-              Start Shipping →
+
+          {/* Lazy loaded animated boat simulation */}
+          <HeroBoatCanvas />
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+            <Link href="/signup" className="btn btn-primary text-sm px-8 py-3 font-bold shadow-md">
+              Book Cargo Shipment →
             </Link>
-            <a href="#how-it-works" className="btn btn-secondary text-base px-8 py-3">
-              Learn More
+            <a href="#comparison" className="btn btn-secondary text-sm px-6 py-3 font-semibold">
+              Live Route Comparison
             </a>
           </div>
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="bg-surface border-y border-default py-12">
+      {/* Key Metrics Section */}
+      <section className="bg-surface border-y border-default py-10">
         <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
           <div>
-            <p className="text-2xl md:text-3xl font-bold text-accent">1,687 km</p>
-            <p className="text-sm text-secondary mt-1">Navigable Waterways</p>
+            <p className="text-3xl font-extrabold text-accent">1,687 km</p>
+            <p className="text-xs text-secondary mt-1 font-medium">Navigable Kerala Waterways</p>
           </div>
           <div>
-            <p className="text-2xl md:text-3xl font-bold text-accent">~40%</p>
-            <p className="text-sm text-secondary mt-1">Cost Savings</p>
+            <p className="text-3xl font-extrabold text-accent">~40%</p>
+            <p className="text-xs text-secondary mt-1 font-medium">Average Cost Reduction</p>
           </div>
           <div>
-            <p className="text-2xl md:text-3xl font-bold text-accent">74%</p>
-            <p className="text-sm text-secondary mt-1">Less CO₂</p>
+            <p className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">74%</p>
+            <p className="text-xs text-secondary mt-1 font-medium">CO₂ Emission Abatement</p>
           </div>
           <div>
-            <p className="text-2xl md:text-3xl font-bold text-accent">15+</p>
-            <p className="text-sm text-secondary mt-1">Active Jetties</p>
+            <p className="text-3xl font-extrabold text-accent">15+ Jetties</p>
+            <p className="text-xs text-secondary mt-1 font-medium">Terminal Graph Network</p>
           </div>
         </div>
       </section>
 
-      {/* Problem & Impact */}
-      <section className="max-w-6xl mx-auto px-4 py-16">
-        <div className="grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-primary mb-6">
-              The Problem We&apos;re Solving
-            </h2>
-            <div className="space-y-4 text-secondary">
-              <p>
-                Kerala has <strong className="text-primary">1,687 km of navigable waterways</strong> — the longest network in India. Yet,
-                over 95% of cargo still moves by road, causing congestion, pollution, and higher costs.
-              </p>
-              <p>
-                Construction companies, sand traders, and agricultural producers spend thousands on
-                truck transport when boats can carry the same load for 40% less, with a fraction of the carbon footprint.
-              </p>
-              <p>
-                The problem? <strong className="text-primary">There&apos;s no easy way to find and book water transport.</strong> Cargo owners
-                don&apos;t know which boats are available, and boat operators lack visibility into demand.
-              </p>
+      {/* Interactive Mini Demo: Road vs Waterway */}
+      <section id="comparison" className="max-w-5xl mx-auto px-4 py-16">
+        <div className="text-center max-w-2xl mx-auto mb-8">
+          <div className="inline-block text-xs font-bold uppercase text-accent mb-1 tracking-wider">
+            Target Demo Scenario
+          </div>
+          <h2 className="text-2xl md:text-3xl font-bold text-primary">
+            Moving Building Material: Kochi ➔ Alappuzha
+          </h2>
+          <p className="text-xs text-secondary mt-1">
+            Adjust the cargo weight below to see real-time cost, duration, and carbon comparisons.
+          </p>
+        </div>
+
+        {/* Weight Selector */}
+        <div className="card p-4 bg-surface border border-default max-w-md mx-auto mb-8 text-center space-y-2">
+          <div className="flex justify-between items-center text-xs">
+            <span className="font-semibold text-secondary">Cargo Payload Weight:</span>
+            <span className="font-extrabold text-base text-accent">{demoWeight} Tonnes ({demoWeight * 1000} kg)</span>
+          </div>
+          <input
+            type="range"
+            min="1"
+            max="30"
+            step="1"
+            value={demoWeight}
+            onChange={(e) => setDemoWeight(parseInt(e.target.value) || 1)}
+            className="w-full accent-[#3F7F83] cursor-pointer"
+          />
+          <div className="flex justify-between text-[10px] text-secondary">
+            <span>1 Tonne (Auto/Pickup)</span>
+            <span>8 Tonnes (Standard Demo)</span>
+            <span>30 Tonnes (Bulk Barge)</span>
+          </div>
+        </div>
+
+        {/* Side by side cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Road */}
+          <div className="card p-6 border border-default bg-main/50 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🚛</span>
+                <h3 className="font-bold text-base text-primary">By Highway Road</h3>
+              </div>
+              <span className="text-xs text-secondary">NH66 Corridor</span>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="flex justify-between py-2 border-b border-default">
+                <span className="text-secondary">Route Distance</span>
+                <span className="font-semibold text-primary">65 km</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-default">
+                <span className="text-secondary">Transit Time</span>
+                <span className="font-semibold text-primary">~{roadDurationHours} Hours</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-default">
+                <span className="text-secondary">Estimated Freight Cost</span>
+                <span className="font-bold text-primary text-sm">₹{roadCost.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="text-secondary">CO₂ Emissions</span>
+                <span className="font-bold text-red-500">{roadCo2Kg} kg CO₂</span>
+              </div>
             </div>
           </div>
-          <div className="card p-6 space-y-4">
-            <h3 className="font-semibold text-primary text-lg">Our Impact Vision</h3>
-            <div className="space-y-3">
-              {[
-                { icon: '🌿', label: 'Reduce CO₂ emissions', desc: '74% lower per tonne-km vs trucks' },
-                { icon: '💰', label: 'Cut transport costs', desc: '30-40% savings for cargo owners' },
-                { icon: '🚢', label: 'Revive waterways', desc: 'Create livelihood for boat operators' },
-                { icon: '🛣️', label: 'Decongest roads', desc: 'Shift heavy cargo off highways' },
-                { icon: '📱', label: 'Digital platform', desc: 'Uber-like booking for water transport' },
-              ].map((item) => (
-                <div key={item.label} className="flex items-start gap-3">
-                  <span className="text-xl">{item.icon}</span>
-                  <div>
-                    <p className="font-medium text-primary text-sm">{item.label}</p>
-                    <p className="text-xs text-secondary">{item.desc}</p>
-                  </div>
-                </div>
-              ))}
+
+          {/* Waterway */}
+          <div className="card p-6 border-2 border-accent bg-accent-light/20 space-y-4 relative overflow-hidden">
+            <div className="absolute top-0 right-0 bg-accent text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">
+              ✨ RECOMMENDED ROUTE
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🚢</span>
+                <h3 className="font-bold text-base text-accent">By Inland Waterway</h3>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="flex justify-between py-2 border-b border-accent/20">
+                <span className="text-secondary">Waterway Distance</span>
+                <span className="font-semibold text-primary">80 km (Vembanad Lake)</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-accent/20">
+                <span className="text-secondary">Transit Time (Barge)</span>
+                <span className="font-semibold text-primary">~{waterDurationHours} Hours</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-accent/20">
+                <span className="text-secondary">Total Multi-modal Cost</span>
+                <span className="font-extrabold text-accent text-base">₹{waterCost.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="text-secondary">CO₂ Emissions</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                  {waterCo2Kg} kg CO₂
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Savings banner */}
+        <div className="mt-6 card p-4 bg-accent text-white rounded-xl text-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <p className="text-2xl font-black">₹{costSaved.toLocaleString()}</p>
+              <p className="text-xs text-white/80">Direct Cost Saved</p>
+            </div>
+            <div>
+              <p className="text-2xl font-black">{costSavedPercent}%</p>
+              <p className="text-xs text-white/80">Cheaper than Trucks</p>
+            </div>
+            <div>
+              <p className="text-2xl font-black">{co2SavedKg} kg</p>
+              <p className="text-xs text-white/80">Net CO₂ Reduction</p>
+            </div>
+            <div>
+              <p className="text-2xl font-black">{co2SavedPercent}%</p>
+              <p className="text-xs text-white/80">Emissions Slashed</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* How it works */}
+      {/* How it Works */}
       <section id="how-it-works" className="bg-surface border-y border-default py-16">
         <div className="max-w-6xl mx-auto px-4">
-          <h2 className="text-2xl md:text-3xl font-bold text-primary text-center mb-4">
-            How JalaSetu Works
+          <h2 className="text-2xl md:text-3xl font-bold text-primary text-center mb-2">
+            How JalaSetu Operates
           </h2>
-          <p className="text-secondary text-center mb-12 max-w-2xl mx-auto">
-            From booking to delivery in 4 simple steps — all managed through our platform.
+          <p className="text-xs text-secondary text-center mb-10 max-w-xl mx-auto">
+            From smart chat booking to live vessel navigation in 4 frictionless steps.
           </p>
-          <div className="grid md:grid-cols-4 gap-6">
+
+          <div className="grid md:grid-cols-4 gap-4">
             {[
               {
-                step: '1',
-                icon: '💬',
-                title: 'Chat & Book',
-                desc: 'Tell our AI assistant what you need to ship — origin, destination, weight, and date. It builds the best multi-modal route.',
+                step: '01',
+                title: 'Conversational Booking',
+                desc: 'Describe cargo details to our Gemini agent. It plans the route through the waterway graph.',
               },
               {
-                step: '2',
-                icon: '⚖️',
-                title: 'Compare Routes',
-                desc: 'See a side-by-side comparison of road vs waterway on cost, time, and CO₂ emissions before confirming.',
+                step: '02',
+                title: 'Multi-Modal Route Plan',
+                desc: 'Road taxi picks up goods to nearest jetty, water barge completes the long transit, delivery taxi drops at destination.',
               },
               {
-                step: '3',
-                icon: '🤝',
-                title: 'Auto-Match',
-                desc: 'We match your cargo with nearby boats and taxis. Providers accept jobs instantly through the app.',
+                step: '03',
+                title: 'Atomic Job Dispatch',
+                desc: 'Vessels and taxis receive offers and claim them atomically with zero double-booking conflicts.',
               },
               {
-                step: '4',
-                icon: '📍',
-                title: 'Track & Deliver',
-                desc: 'Track your cargo in real-time on a live map. Rate providers after delivery.',
+                step: '04',
+                title: 'Realtime GPS & Delivery',
+                desc: 'Shippers follow live boat coordinates, get automated status milestones, and rate operators.',
               },
             ].map((item) => (
-              <div key={item.step} className="card p-6 text-center relative">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-accent text-white text-sm font-bold flex items-center justify-center">
-                  {item.step}
-                </div>
-                <div className="text-3xl mb-3 mt-2">{item.icon}</div>
-                <h3 className="font-semibold text-primary mb-2">{item.title}</h3>
-                <p className="text-sm text-secondary">{item.desc}</p>
+              <div key={item.step} className="card p-5 bg-main border border-default rounded-xl space-y-2">
+                <span className="text-2xl font-black text-accent">{item.step}</span>
+                <h3 className="font-bold text-sm text-primary">{item.title}</h3>
+                <p className="text-xs text-secondary leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Features per role */}
+      {/* Role Features */}
       <section id="features" className="max-w-6xl mx-auto px-4 py-16">
-        <h2 className="text-2xl md:text-3xl font-bold text-primary text-center mb-4">
-          Built for Everyone
+        <h2 className="text-2xl md:text-3xl font-bold text-primary text-center mb-2">
+          Tailored Workspaces for Every Role
         </h2>
-        <p className="text-secondary text-center mb-12 max-w-2xl mx-auto">
-          Whether you&apos;re shipping cargo or providing transport, JalaSetu has you covered.
+        <p className="text-xs text-secondary text-center mb-10">
+          Designed mobile-first for boat operators on water, truckers on road, and cargo shippers.
         </p>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+        <div className="grid md:grid-cols-4 gap-4">
           {[
             {
               role: 'Cargo Owners',
               icon: '📦',
-              color: 'text-blue-600',
-              features: [
-                'AI-powered chat booking',
-                'Road vs Water comparison',
-                'Real-time cargo tracking',
-                'Cost & CO₂ estimates',
-              ],
+              bullets: ['AI natural language booking', 'Side-by-side cost & CO₂ comparison', 'Live boat GPS tracking', 'Post-delivery reviews'],
             },
             {
               role: 'Boat Operators',
-              icon: '⚓',
-              color: 'text-accent',
-              features: [
-                'Job offers pushed to you',
-                'One-tap accept',
-                'GPS-tracked routes',
-                'Fleet management',
-              ],
+              icon: '🚢',
+              bullets: ['Vessel capacity registration (in kg)', 'Live backwater navigation map', '1-tap atomic job claiming', 'Guaranteed high-tonnage payouts'],
             },
             {
               role: 'Taxi / Truck Drivers',
               icon: '🚛',
-              color: 'text-orange-600',
-              features: [
-                'First/last mile pickups',
-                'Route to nearest jetty',
-                'Fair, transparent pricing',
-                'Flexible schedule',
-              ],
+              bullets: ['First & last mile cargo jobs', 'Vehicle payload matching', 'Direct jetty routing', 'Synchronized boat ETA arrival alerts'],
             },
             {
-              role: 'Loading Workers',
+              role: 'Loading Crew',
               icon: '💪',
-              color: 'text-green-600',
-              features: [
-                'Loading/unloading jobs',
-                'Advanced notifications',
-                'Jetty-based matching',
-                'Ratings & reputation',
-              ],
+              bullets: ['Terminal stevedore tasks', '5-hour advance notification buffer', 'Jetty-based matching', 'Per-tonne labor earnings'],
             },
-          ].map((role) => (
-            <div key={role.role} className="card p-6">
-              <div className="text-3xl mb-3">{role.icon}</div>
-              <h3 className="font-semibold text-primary mb-3">{role.role}</h3>
-              <ul className="space-y-2">
-                {role.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-secondary">
-                    <span className="text-accent mt-0.5">✓</span>
-                    <span>{f}</span>
+          ].map((item) => (
+            <div key={item.role} className="card p-5 bg-surface border border-default rounded-xl space-y-3">
+              <span className="text-3xl block">{item.icon}</span>
+              <h3 className="font-bold text-sm text-primary">{item.role}</h3>
+              <ul className="space-y-1.5 text-xs text-secondary">
+                {item.bullets.map((b, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <span className="text-accent">✓</span>
+                    <span>{b}</span>
                   </li>
                 ))}
               </ul>
@@ -285,286 +367,138 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Live Demo — Road vs Water comparison */}
-      <section id="comparison" className="bg-surface border-y border-default py-16">
-        <div className="max-w-4xl mx-auto px-4">
-          <h2 className="text-2xl md:text-3xl font-bold text-primary text-center mb-4">
-            Road vs Water: See the Difference
-          </h2>
-          <p className="text-secondary text-center mb-8">
-            Example: Moving 8 tonnes of building material from <strong className="text-primary">Kochi → Alappuzha</strong>
-          </p>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Road */}
-            <div className="card p-6 border-2 border-default">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-2xl">🚛</span>
-                <h3 className="font-semibold text-primary text-lg">By Road</h3>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center py-2 border-b border-default">
-                  <span className="text-sm text-secondary">Distance</span>
-                  <span className="font-medium text-primary">~65 km (NH66)</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-default">
-                  <span className="text-sm text-secondary">Duration</span>
-                  <span className="font-medium text-primary">~2.5 hours</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-default">
-                  <span className="text-sm text-secondary">Estimated Cost</span>
-                  <span className="font-medium text-primary">₹3,120</span>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-sm text-secondary">CO₂ Emissions</span>
-                  <span className="font-medium" style={{ color: 'var(--color-error)' }}>32.2 kg</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Water */}
-            <div className="card p-6 border-2" style={{ borderColor: 'var(--color-accent)' }}>
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-2xl">🚢</span>
-                <h3 className="font-semibold text-accent text-lg">By Waterway ✨</h3>
-                <span className="ml-auto px-2 py-0.5 rounded-full bg-accent-light text-accent text-xs font-medium">
-                  Recommended
-                </span>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center py-2 border-b border-default">
-                  <span className="text-sm text-secondary">Water Route</span>
-                  <span className="font-medium text-primary">~80 km (backwaters)</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-default">
-                  <span className="text-sm text-secondary">Duration</span>
-                  <span className="font-medium text-primary">~4-5 hours</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-default">
-                  <span className="text-sm text-secondary">Estimated Cost</span>
-                  <span className="font-medium text-accent">₹1,880</span>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-sm text-secondary">CO₂ Emissions</span>
-                  <span className="font-medium" style={{ color: 'var(--color-success)' }}>10.2 kg</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Savings summary */}
-          <div className="mt-6 card p-4 bg-accent-light">
-            <div className="flex flex-wrap gap-6 justify-center text-center">
-              <div>
-                <p className="text-2xl font-bold text-accent">₹1,240</p>
-                <p className="text-xs text-secondary">Cost Saved</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-accent">40%</p>
-                <p className="text-xs text-secondary">Cheaper</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-accent">22 kg</p>
-                <p className="text-xs text-secondary">CO₂ Reduced</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-accent">68%</p>
-                <p className="text-xs text-secondary">Less Emissions</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* FAQ */}
-      <section className="max-w-4xl mx-auto px-4 py-16">
-        <h2 className="text-2xl md:text-3xl font-bold text-primary text-center mb-12">
-          Frequently Asked Questions
-        </h2>
-        <div className="space-y-4">
-          {[
-            {
-              q: 'What kind of cargo can I ship through waterways?',
-              a: 'Building materials (sand, cement, bricks), agricultural products, timber, and general goods under 15 tonnes. Hazardous materials are not supported.',
-            },
-            {
-              q: 'How is the waterway route determined?',
-              a: 'We use a graph of Kerala\'s jetties and waterway connections. Our algorithm finds the shortest path through the backwaters, then adds road legs from your location to the nearest jetty and from the destination jetty to your delivery point.',
-            },
-            {
-              q: 'Is my cargo insured during water transport?',
-              a: 'Basic coverage is included. We recommend discussing additional insurance with your boat operator for high-value cargo.',
-            },
-            {
-              q: 'How does pricing work?',
-              a: 'Pricing is based on weight (per tonne), distance (per km), and vehicle type. Water transport costs about ₹3.50/tonne-km vs ₹6.00/tonne-km by road. Loading charges are separate at ₹150/tonne.',
-            },
-            {
-              q: 'Can I track my cargo in real-time?',
-              a: 'Yes! Once your cargo is picked up, you can see the live location of the boat and taxi on a map, along with estimated arrival time.',
-            },
-            {
-              q: 'How do I become a boat operator or taxi driver on JalaSetu?',
-              a: 'Sign up with the "Ship Owner" or "Taxi" role, add your boat or vehicle details, and go online to start receiving job offers.',
-            },
-          ].map((faq, i) => (
-            <details key={i} className="card group">
-              <summary className="p-4 cursor-pointer font-medium text-primary flex items-center justify-between">
-                <span>{faq.q}</span>
-                <span className="text-accent text-xl group-open:rotate-45 transition-transform">+</span>
-              </summary>
-              <div className="px-4 pb-4 text-sm text-secondary">
-                {faq.a}
-              </div>
-            </details>
-          ))}
+      <section id="faq" className="bg-surface border-y border-default py-16">
+        <div className="max-w-4xl mx-auto px-4 space-y-6">
+          <h2 className="text-2xl md:text-3xl font-bold text-primary text-center mb-2">
+            Frequently Asked Questions
+          </h2>
+
+          <div className="space-y-3 text-xs">
+            {[
+              {
+                q: 'How are road and water routes computed?',
+                a: 'Road legs use OSRM routing over OpenStreetMap roads. Water routes use Dijkstra algorithm on our hand-built graph of 15 Kerala jetties across Vembanad Lake and National Waterway 3.',
+              },
+              {
+                q: 'How does atomic job claiming work?',
+                a: 'Job offers use an atomic PostgreSQL function (claim_job) that assigns the job in a single row-level update. If two providers tap Accept simultaneously, only one succeeds and the other gets an instant already-taken notification.',
+              },
+              {
+                q: 'What cargo is suitable for Kerala waterways?',
+                a: 'Construction materials (aggregates, sand, cement, steel, bricks), timber, agricultural produce, and heavy industrial machinery benefit most from barge freight.',
+              },
+              {
+                q: 'How does JalaSetu handle scheduling and cron jobs?',
+                a: 'Background jobs run through pg_cron calling a secured /api/cron/tick route every minute. It handles 1-minute timeout radius expansions and scheduled notify_at alerts.',
+              },
+            ].map((faq, idx) => (
+              <details key={idx} className="card p-4 bg-main border border-default rounded-xl group cursor-pointer">
+                <summary className="font-bold text-primary flex justify-between items-center">
+                  <span>{faq.q}</span>
+                  <span className="text-accent group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <p className="mt-2 text-secondary leading-relaxed pt-2 border-t border-default">{faq.a}</p>
+              </details>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Contact Us */}
-      <section id="contact" className="bg-surface border-y border-default py-16">
-        <div className="max-w-2xl mx-auto px-4">
-          <h2 className="text-2xl md:text-3xl font-bold text-primary text-center mb-4">
-            Contact Us
-          </h2>
-          <p className="text-secondary text-center mb-8">
-            Have questions, feedback, or partnership inquiries? We&apos;d love to hear from you.
-          </p>
+      {/* Contact Form */}
+      <section id="contact" className="max-w-2xl mx-auto px-4 py-16 w-full">
+        <div className="card p-6 bg-surface border border-default rounded-xl space-y-4">
+          <div>
+            <h2 className="text-xl font-bold text-primary">Contact JalaSetu Operations</h2>
+            <p className="text-xs text-secondary">
+              Inquire about bulk shipping, partner fleets, or port terminal integrations in Kerala
+            </p>
+          </div>
 
           {sent ? (
-            <div className="card p-8 text-center">
-              <div className="text-4xl mb-4">✅</div>
-              <h3 className="font-semibold text-primary text-lg mb-2">Message Sent!</h3>
-              <p className="text-secondary text-sm mb-4">
-                Thank you for reaching out. We&apos;ll get back to you soon.
-              </p>
+            <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded-lg text-xs font-semibold text-center space-y-2">
+              <p>✓ Thank you! Your message has been logged in our operations queue.</p>
               <button
+                type="button"
                 onClick={() => setSent(false)}
-                className="btn btn-secondary text-sm"
+                className="btn btn-secondary text-xs py-1"
               >
-                Send Another Message
+                Send Another Inquiry
               </button>
             </div>
           ) : (
-            <form onSubmit={handleContact} className="card p-6 space-y-4">
-              <div>
-                <label htmlFor="contact-name" className="label">Name</label>
+            <form onSubmit={handleContact} className="space-y-3 text-xs">
+              {contactError && (
+                <div className="p-2.5 bg-red-50 text-red-600 rounded text-xs">{contactError}</div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="label text-[11px]">Your Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={contactForm.name}
+                    onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                    className="input text-xs"
+                    placeholder="e.g. Anand Menon"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label text-[11px]">Email Address</label>
+                  <input
+                    type="email"
+                    required
+                    value={contactForm.email}
+                    onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                    className="input text-xs"
+                    placeholder="name@company.com"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="label text-[11px]">Subject</label>
                 <input
-                  id="contact-name"
                   type="text"
-                  required
-                  className="input"
-                  placeholder="Your name"
-                  value={contactForm.name}
-                  onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                  value={contactForm.subject}
+                  onChange={(e) => setContactForm({ ...contactForm, subject: e.target.value })}
+                  className="input text-xs"
+                  placeholder="Bulk freight agreement / Jetty partnership"
                 />
               </div>
-              <div>
-                <label htmlFor="contact-email" className="label">Email</label>
-                <input
-                  id="contact-email"
-                  type="email"
-                  required
-                  className="input"
-                  placeholder="your@email.com"
-                  value={contactForm.email}
-                  onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                />
-              </div>
-              <div>
-                <label htmlFor="contact-message" className="label">Message</label>
+
+              <div className="space-y-1">
+                <label className="label text-[11px]">Message</label>
                 <textarea
-                  id="contact-message"
+                  rows={3}
                   required
-                  rows={4}
-                  className="input resize-none"
-                  placeholder="How can we help you?"
                   value={contactForm.message}
                   onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
+                  className="input text-xs resize-none"
+                  placeholder="Describe your freight specifications or vessel capacity..."
                 />
               </div>
-              {contactError && (
-                <p className="error-text">{contactError}</p>
-              )}
+
               <button
                 type="submit"
                 disabled={sending}
-                className="btn btn-primary w-full"
+                className="btn btn-primary w-full py-2.5 text-xs font-bold"
               >
-                {sending ? (
-                  <span className="flex items-center gap-2">
-                    <span className="spinner" style={{ width: 16, height: 16 }} />
-                    Sending...
-                  </span>
-                ) : (
-                  'Send Message'
-                )}
+                {sending ? 'Submitting Message...' : 'Submit Inquiry'}
               </button>
             </form>
           )}
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-16" style={{ backgroundColor: 'var(--color-accent)' }}>
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
-            Ready to Ship Smarter?
-          </h2>
-          <p className="text-white/80 mb-8 max-w-xl mx-auto">
-            Join Kerala&apos;s inland water transport revolution. Save money, save time, save the planet.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link
-              href="/signup"
-              className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-white text-accent font-semibold rounded-lg hover:bg-white/90 transition-colors"
-            >
-              Create Free Account →
-            </Link>
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center gap-2 px-8 py-3 border-2 border-white text-white font-semibold rounded-lg hover:bg-white/10 transition-colors"
-            >
-              Sign In
-            </Link>
-          </div>
-        </div>
-      </section>
-
       {/* Footer */}
-      <footer className="bg-surface border-t border-default py-8">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="grid md:grid-cols-3 gap-8 mb-8">
-            <div>
-              <h3 className="font-bold text-accent text-lg mb-3">🚢 JalaSetu</h3>
-              <p className="text-sm text-secondary">
-                Kerala&apos;s first inland water transport marketplace. 
-                Connecting cargo owners with boat operators across 1,687 km of backwaters.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-primary mb-3 text-sm">Quick Links</h4>
-              <div className="space-y-2">
-                <Link href="/signup" className="block text-sm text-secondary hover:text-accent transition-colors">Sign Up</Link>
-                <Link href="/login" className="block text-sm text-secondary hover:text-accent transition-colors">Sign In</Link>
-                <a href="#how-it-works" className="block text-sm text-secondary hover:text-accent transition-colors">How it Works</a>
-                <a href="#features" className="block text-sm text-secondary hover:text-accent transition-colors">Features</a>
-              </div>
-            </div>
-            <div>
-              <h4 className="font-semibold text-primary mb-3 text-sm">For Providers</h4>
-              <div className="space-y-2">
-                <Link href="/signup" className="block text-sm text-secondary hover:text-accent transition-colors">Register as Boat Operator</Link>
-                <Link href="/signup" className="block text-sm text-secondary hover:text-accent transition-colors">Register as Taxi Driver</Link>
-                <Link href="/signup" className="block text-sm text-secondary hover:text-accent transition-colors">Register as Worker</Link>
-              </div>
-            </div>
-          </div>
-          <div className="border-t border-default pt-6 text-center">
-            <p className="text-xs text-secondary">
-              © 2026 JalaSetu. Built with ❤️ for Kerala&apos;s waterways. Hackathon Project.
-            </p>
-          </div>
+      <footer className="bg-surface border-t border-default py-8 text-center text-xs text-secondary mt-auto">
+        <div className="max-w-6xl mx-auto px-4 space-y-2">
+          <p className="font-bold text-accent">🚢 JalaSetu — Kerala Inland Waterway Marketplace</p>
+          <p className="text-[11px]">
+            Hackathon Edition • National Waterways 3 (Kottappuram to Kollam) • Built with Next.js, Supabase, PostGIS, Leaflet, and Gemini.
+          </p>
         </div>
       </footer>
     </div>

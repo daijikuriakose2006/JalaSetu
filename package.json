@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "seed:users": "tsx scripts/seed-users.ts",
-    "dev:cron": "tsx scripts/dev-cron.ts"
+    "dev:cron": "tsx scripts/dev-cron.ts",
+    "demo:walkthrough": "tsx scripts/demo-walkthrough.ts",
+    "test:claim": "tsx scripts/test-atomic-claim.ts"
   },
   "dependencies": {
     "@google/genai": "^2.27.0",
