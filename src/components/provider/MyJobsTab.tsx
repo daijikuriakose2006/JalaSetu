@@ -148,9 +148,12 @@ export default function MyJobsTab({
     return (
       <div className="card p-12 text-center bg-surface border border-default">
         <span className="text-4xl mb-3 block">⚓</span>
-        <h3 className="font-semibold text-primary text-base mb-1">No Active Jobs</h3>
-        <p className="text-xs text-secondary mb-4">
-          Check the <strong>Requests</strong> tab to accept incoming orders and start earning.
+        <h3 className="font-semibold text-primary text-base mb-1">No Assigned Jobs Yet</h3>
+        <p className="text-xs text-secondary mb-3 max-w-md mx-auto">
+          You haven&apos;t accepted any tasks yet. Check the <strong>Requests</strong> tab to accept incoming orders and start earning.
+        </p>
+        <p className="text-xs text-accent font-medium">
+          💡 Tip: Click <strong>&quot;⚡ Generate Demo Jobs&quot;</strong> in the header above to spawn test dispatches and practice claiming!
         </p>
       </div>
     );

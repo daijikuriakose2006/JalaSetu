@@ -33,7 +33,11 @@ export async function GET(request: Request) {
     }
 
     if (type) {
-      query = query.eq('type', type as any);
+      if (type === 'worker') {
+        query = query.in('type', ['load', 'unload']);
+      } else {
+        query = query.eq('type', type as any);
+      }
     }
     if (status && mineOnly) {
       query = query.eq('status', status as any);
@@ -44,13 +48,14 @@ export async function GET(request: Request) {
     const { data: jobs, error } = await query;
     if (error) throw error;
 
-    // Filter requests in JS if not mineOnly to include offered_to OR queued orders
+    // Filter requests in JS if not mineOnly to include offered_to OR queued orders OR open pool
     let result = (jobs || []) as (Job & { orders: Order })[];
     if (!mineOnly) {
       result = result.filter((j) => {
         const isOffered = Array.isArray(j.offered_to) && j.offered_to.includes(user.id);
+        const isOpenPool = !j.offered_to || (Array.isArray(j.offered_to) && j.offered_to.length === 0);
         const isQueued = j.orders?.status === 'queued';
-        return isOffered || isQueued;
+        return isOffered || isOpenPool || isQueued;
       });
     }
 

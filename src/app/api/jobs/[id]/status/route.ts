@@ -56,7 +56,7 @@ export async function PATCH(
     // Map provider sub-status into job_status enum if needed:
     // job status enum is: open, assigned, active, done, cancelled
     let dbJobStatus: string = job.status;
-    if (['heading_to_pickup', 'heading_to_jetty', 'heading', 'in_transit', 'loaded'].includes(newStatus)) {
+    if (['heading_to_pickup', 'heading_to_jetty', 'heading', 'started', 'in_transit', 'loaded'].includes(newStatus)) {
       dbJobStatus = 'active';
     } else if (['dropped', 'arrived', 'done'].includes(newStatus)) {
       dbJobStatus = 'done';

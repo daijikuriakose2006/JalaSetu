@@ -8,9 +8,17 @@ import RequestsTab from '@/components/provider/RequestsTab';
 import JobOfferBanner, { type OfferBannerData } from '@/components/provider/JobOfferBanner';
 import type { Job } from '@/lib/types/database';
 
-export default function WorkerDashboard() {
+interface WorkerDashboardProps {
+  initialTab?: 'map' | 'jobs' | 'requests';
+}
+
+export default function WorkerDashboard({ initialTab = 'map' }: WorkerDashboardProps) {
   const { profile, refreshProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'map' | 'jobs' | 'requests'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'jobs' | 'requests'>(initialTab);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
   const [isOnline, setIsOnline] = useState<boolean>(profile?.is_online ?? true);
   const [activeJob, setActiveJob] = useState<Job | null>(null);
 
@@ -18,6 +26,7 @@ export default function WorkerDashboard() {
   const [requests, setRequests] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [incomingOffer, setIncomingOffer] = useState<OfferBannerData | null>(null);
+  const [seedingDemo, setSeedingDemo] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -26,31 +35,30 @@ export default function WorkerDashboard() {
       if (myRes.ok) {
         const data = await myRes.json();
         setMyJobs(data.jobs || []);
-        if (!activeJob && data.jobs?.length > 0) {
-          setActiveJob(data.jobs[0]);
-        }
+        setActiveJob((prev) => prev || (data.jobs?.length > 0 ? data.jobs[0] : null));
       }
 
-      // 2. Open load/unload requests
-      const reqRes = await fetch('/api/jobs');
+      // 2. Open load/unload requests specifically for workers
+      const reqRes = await fetch('/api/jobs?type=worker');
       if (reqRes.ok) {
         const data = await reqRes.json();
-        const available = (data.jobs || []).filter(
-          (j: any) => j.type === 'load' || j.type === 'unload'
-        );
+        const available = data.jobs || [];
         setRequests(available);
 
-        if (available.length > 0 && !incomingOffer) {
+        if (available.length > 0) {
           const first = available[0];
-          setIncomingOffer({
-            jobId: first.id,
-            orderId: first.order_id,
-            type: first.type,
-            from: first.orders?.origin_address || 'Jetty Location',
-            destination: first.orders?.destination_address || 'Jetty Location',
-            item: first.orders?.cargo_name || 'Goods',
-            quantity: `${first.orders?.weight_tonnes || 0} tonnes`,
-            estimatedPayout: first.estimated_payout || 400,
+          setIncomingOffer((prev) => {
+            if (prev) return prev;
+            return {
+              jobId: first.id,
+              orderId: first.order_id,
+              type: first.type,
+              from: first.orders?.origin_address || 'Jetty Location',
+              destination: first.orders?.destination_address || 'Jetty Location',
+              item: first.orders?.cargo_name || 'Goods',
+              quantity: `${first.orders?.weight_tonnes || 0} tonnes`,
+              estimatedPayout: first.estimated_payout || 400,
+            };
           });
         }
       }
@@ -59,7 +67,7 @@ export default function WorkerDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [activeJob, incomingOffer]);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -106,6 +114,24 @@ export default function WorkerDashboard() {
     }
   };
 
+  const handleSeedDemoOrder = async () => {
+    setSeedingDemo(true);
+    try {
+      const res = await fetch('/api/orders/seed-demo', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        await loadData();
+        setActiveTab('requests');
+      } else {
+        alert(data.error || 'Failed to seed demo order');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSeedingDemo(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <JobOfferBanner
@@ -130,54 +156,67 @@ export default function WorkerDashboard() {
           </p>
         </div>
 
-        {/* Tab switcher */}
-        <div className="flex p-1 bg-main border border-default rounded-xl self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {/* Quick Demo Seed helper button */}
           <button
             type="button"
-            onClick={() => setActiveTab('map')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              activeTab === 'map' ? 'bg-accent text-white shadow-xs' : 'text-secondary hover:text-primary'
-            }`}
+            onClick={handleSeedDemoOrder}
+            disabled={seedingDemo}
+            className="btn btn-secondary text-xs px-3 py-1.5 font-medium border-dashed border-accent text-accent hover:bg-accent hover:text-white transition-colors"
+            title="Create a sample 8t Kochi→Alappuzha order with Loading & Unloading jobs to test"
           >
-            🗺️ Jetty Map
+            {seedingDemo ? 'Creating Demo...' : '⚡ Generate Demo Jobs'}
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('jobs')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              activeTab === 'jobs' ? 'bg-accent text-white shadow-xs' : 'text-secondary hover:text-primary'
-            }`}
-          >
-            💪 My Tasks ({myJobs.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('requests')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all relative ${
-              activeTab === 'requests' ? 'bg-accent text-white shadow-xs' : 'text-secondary hover:text-primary'
-            }`}
-          >
-            📨 Requests
-            {requests.length > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-red-500 text-white text-[10px]">
-                {requests.length}
-              </span>
-            )}
-          </button>
+
+          {/* Tab switcher */}
+          <div className="flex p-1 bg-main border border-default rounded-xl">
+            <button
+              type="button"
+              onClick={() => setActiveTab('map')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'map' ? 'bg-accent text-white shadow-xs' : 'text-secondary hover:text-primary'
+              }`}
+            >
+              🗺️ Jetty Map
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('jobs')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'jobs' ? 'bg-accent text-white shadow-xs' : 'text-secondary hover:text-primary'
+              }`}
+            >
+              💪 My Tasks ({myJobs.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('requests')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all relative ${
+                activeTab === 'requests' ? 'bg-accent text-white shadow-xs' : 'text-secondary hover:text-primary'
+              }`}
+            >
+              📨 Requests
+              {requests.length > 0 && (
+                <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-red-500 text-white text-[10px]">
+                  {requests.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Tab Panels */}
-      {activeTab === 'map' && (
+      {/* Tab Panels: keep mounted to avoid destroying Leaflet map & preserve GPS watch */}
+      <div className={activeTab === 'map' ? 'block' : 'hidden'}>
         <ProviderMapTab
           role="worker"
           activeJob={activeJob}
           isOnline={isOnline}
           onToggleOnline={handleToggleOnline}
         />
-      )}
+      </div>
 
-      {activeTab === 'jobs' && (
+      <div className={activeTab === 'jobs' ? 'block' : 'hidden'}>
         <MyJobsTab
           jobs={myJobs}
           role="worker"
@@ -186,15 +225,15 @@ export default function WorkerDashboard() {
           onUpdateStatus={handleUpdateStatus}
           loading={loading}
         />
-      )}
+      </div>
 
-      {activeTab === 'requests' && (
+      <div className={activeTab === 'requests' ? 'block' : 'hidden'}>
         <RequestsTab
           requests={requests}
           onAccept={handleClaimJob}
           loading={loading}
         />
-      )}
+      </div>
     </div>
   );
 }

@@ -45,9 +45,12 @@ export default function RequestsTab({
     return (
       <div className="card p-12 text-center bg-surface border border-default">
         <span className="text-4xl mb-3 block">📨</span>
-        <h3 className="font-semibold text-primary text-base mb-1">No New Requests</h3>
-        <p className="text-xs text-secondary mb-2">
-          You are currently in the dispatch queue. Stay online on the <strong>Map</strong> tab to receive immediate pop-up alerts.
+        <h3 className="font-semibold text-primary text-base mb-1">No New Requests in Queue</h3>
+        <p className="text-xs text-secondary mb-3 max-w-md mx-auto">
+          No open dispatches available at the moment. As cargo owners create shipments, job offers will automatically appear here.
+        </p>
+        <p className="text-xs text-accent font-medium">
+          💡 Tip: Click <strong>&quot;⚡ Generate Demo Jobs&quot;</strong> in the header above to spawn a sample 8t Kochi→Alappuzha order and test claiming!
         </p>
       </div>
     );
