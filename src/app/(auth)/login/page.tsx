@@ -21,7 +21,9 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const data = loginSchema.parse({ email, password });
+      const trimmedEmail = email.trim();
+      const trimmedPassword = password.trim();
+      const data = loginSchema.parse({ email: trimmedEmail, password: trimmedPassword });
       const supabase = createClient();
       
       const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -47,6 +49,20 @@ export default function LoginPage() {
     }
   };
 
+  const handleQuickFill = (demoEmail: string, demoPass: string) => {
+    setEmail(demoEmail);
+    setPassword(demoPass);
+    setError(null);
+  };
+
+  const demoAccounts = [
+    { label: 'Taxi Driver', email: 'taxi@jalasetu.in', pass: 'Taxi@123', icon: '🚛' },
+    { label: 'Worker', email: 'worker@jalasetu.in', pass: 'Worker@123', icon: '💪' },
+    { label: 'Ship Owner', email: 'ship@jalasetu.in', pass: 'Ship@123', icon: '🚢' },
+    { label: 'Cargo Owner', email: 'user@jalasetu.in', pass: 'User@123', icon: '📦' },
+    { label: 'Admin', email: 'admin@jalasetu.in', pass: 'Admin@123', icon: '🛡️' },
+  ];
+
   return (
     <div className="card bg-surface p-6 rounded-xl shadow-sm border border-default">
       <h2 className="text-xl font-semibold mb-6 text-center">Login to your account</h2>
@@ -56,6 +72,25 @@ export default function LoginPage() {
           {error}
         </div>
       )}
+
+      {/* Quick Demo Login Fillers */}
+      <div className="mb-5 p-3 rounded-lg bg-main border border-default">
+        <p className="text-xs font-semibold text-secondary mb-2">⚡ 1-Click Demo Login Credentials:</p>
+        <div className="flex flex-wrap gap-1.5">
+          {demoAccounts.map((acc) => (
+            <button
+              key={acc.email}
+              type="button"
+              onClick={() => handleQuickFill(acc.email, acc.pass)}
+              className="text-[11px] px-2.5 py-1 rounded-md border border-default bg-surface hover:border-accent hover:text-accent transition-colors flex items-center gap-1 font-medium"
+              title={`Click to fill ${acc.email}`}
+            >
+              <span>{acc.icon}</span>
+              <span>{acc.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
       <form onSubmit={handleLogin} className="space-y-4">
         <div className="space-y-1">

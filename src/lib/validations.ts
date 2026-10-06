@@ -58,8 +58,8 @@ export const signupSchema = z
 
 // Login validation
 export const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
+  email: z.string().trim().email('Invalid email address'),
+  password: z.string().trim().min(1, 'Password is required'),
 });
 
 // Forgot password
