@@ -1,13 +1,19 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createUntypedAdminClient } from '@/lib/supabase/admin-untyped';
 import { resetPasswordSchema } from '@/lib/validations';
 import { createHash } from 'crypto';
+
+interface TokenRecord {
+  id: string;
+  email: string;
+  expires_at: string;
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const parsed = resetPasswordSchema.safeParse(body);
-
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Validation failed', details: parsed.error.flatten() },
@@ -19,9 +25,10 @@ export async function POST(request: Request) {
     const tokenHash = createHash('sha256').update(token).digest('hex');
 
     const supabase = createAdminClient();
+    const db = createUntypedAdminClient();
 
     // Find the reset token
-    const { data: tokenRecords } = await supabase
+    const { data: tokenRecords } = await db
       .from('password_reset_otps')
       .select('*')
       .eq('otp_hash', `reset:${tokenHash}`)
@@ -36,9 +43,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const tokenRecord = tokenRecords[0];
+    const tokenRecord = tokenRecords[0] as TokenRecord;
 
-    // Check expiry
     if (new Date(tokenRecord.expires_at) < new Date()) {
       return NextResponse.json(
         { error: 'Reset link has expired. Please request a new one.' },
@@ -47,12 +53,12 @@ export async function POST(request: Request) {
     }
 
     // Mark token as used
-    await supabase
+    await db
       .from('password_reset_otps')
-      .update({ used: true } as Record<string, unknown>)
+      .update({ used: true })
       .eq('id', tokenRecord.id);
 
-    // Find the user by email
+    // Find user by email
     const { data: users } = await supabase.auth.admin.listUsers();
     const user = users?.users?.find(
       (u) => u.email?.toLowerCase() === tokenRecord.email.toLowerCase()
@@ -65,7 +71,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Update password via Supabase admin API
+    // Update password
     const { error: updateError } = await supabase.auth.admin.updateUserById(
       user.id,
       { password }
@@ -80,7 +86,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
-      message: 'Password reset successfully. You can now sign in with your new password.',
+      message: 'Password reset successfully. You can now sign in.',
     });
   } catch (error) {
     console.error('Reset password error:', error);

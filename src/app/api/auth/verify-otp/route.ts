@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createUntypedAdminClient } from '@/lib/supabase/admin-untyped';
 import { verifyOtpSchema } from '@/lib/validations';
 import { createHash, randomBytes } from 'crypto';
 
@@ -7,11 +7,20 @@ function hashOtp(otp: string): string {
   return createHash('sha256').update(otp).digest('hex');
 }
 
+interface OtpRecord {
+  id: string;
+  email: string;
+  otp_hash: string;
+  attempts: number;
+  max_attempts: number;
+  expires_at: string;
+  used: boolean;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const parsed = verifyOtpSchema.safeParse(body);
-
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Validation failed', details: parsed.error.flatten() },
@@ -20,10 +29,10 @@ export async function POST(request: Request) {
     }
 
     const { email, otp } = parsed.data;
-    const supabase = createAdminClient();
+    const db = createUntypedAdminClient();
 
-    // Find the latest unused OTP for this email
-    const { data: otpRecords } = await supabase
+    // Find the latest unused OTP
+    const { data: otpRecords } = await db
       .from('password_reset_otps')
       .select('*')
       .eq('email', email.toLowerCase())
@@ -38,7 +47,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const otpRecord = otpRecords[0];
+    const otpRecord = otpRecords[0] as OtpRecord;
 
     // Check expiry
     if (new Date(otpRecord.expires_at) < new Date()) {
@@ -50,12 +59,10 @@ export async function POST(request: Request) {
 
     // Check attempts
     if (otpRecord.attempts >= otpRecord.max_attempts) {
-      // Mark as used
-      await supabase
+      await db
         .from('password_reset_otps')
-        .update({ used: true } as Record<string, unknown>)
+        .update({ used: true })
         .eq('id', otpRecord.id);
-
       return NextResponse.json(
         { error: 'Too many attempts. Please request a new code.' },
         { status: 400 }
@@ -63,43 +70,40 @@ export async function POST(request: Request) {
     }
 
     // Increment attempts
-    await supabase
+    await db
       .from('password_reset_otps')
-      .update({ attempts: otpRecord.attempts + 1 } as Record<string, unknown>)
+      .update({ attempts: otpRecord.attempts + 1 })
       .eq('id', otpRecord.id);
 
     // Verify OTP hash
     const otpHash = hashOtp(otp);
     if (otpHash !== otpRecord.otp_hash) {
-      const remainingAttempts = otpRecord.max_attempts - otpRecord.attempts - 1;
+      const remaining = otpRecord.max_attempts - otpRecord.attempts - 1;
       return NextResponse.json(
-        { error: `Invalid code. ${remainingAttempts} attempt(s) remaining.` },
+        { error: `Invalid code. ${remaining} attempt(s) remaining.` },
         { status: 400 }
       );
     }
 
-    // OTP is valid! Mark as used
-    await supabase
+    // OTP valid! Mark as used
+    await db
       .from('password_reset_otps')
-      .update({ used: true } as Record<string, unknown>)
+      .update({ used: true })
       .eq('id', otpRecord.id);
 
-    // Generate a short-lived reset token (15 minutes)
+    // Generate short-lived reset token (15 min)
     const resetToken = randomBytes(32).toString('hex');
     const tokenHash = createHash('sha256').update(resetToken).digest('hex');
 
-    // Store the reset token (reuse OTP table with a special marker)
-    await supabase.from('password_reset_otps').insert({
+    await db.from('password_reset_otps').insert({
       email: email.toLowerCase(),
       otp_hash: `reset:${tokenHash}`,
       expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       max_attempts: 1,
-    } as Record<string, unknown>);
-
-    return NextResponse.json({
-      message: 'Code verified successfully',
-      resetToken,
+      used: false,
     });
+
+    return NextResponse.json({ message: 'Code verified successfully', resetToken });
   } catch (error) {
     console.error('Verify OTP error:', error);
     return NextResponse.json(

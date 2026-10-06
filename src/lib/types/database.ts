@@ -219,29 +219,52 @@ export interface StatusChange {
   by: string;
 }
 
+export interface PasswordResetOtp {
+  id: string;
+  email: string;
+  otp_hash: string;
+  attempts: number;
+  max_attempts: number;
+  expires_at: string;
+  used: boolean;
+  created_at: string;
+}
+
 // Supabase Database type (simplified - enough for type safety)
 export interface Database {
   public: {
     Tables: {
-      profiles: { Row: Profile; Insert: Partial<Profile> & { id: string; name: string; email: string }; Update: Partial<Profile> };
-      preferred_locations: { Row: PreferredLocation; Insert: Omit<PreferredLocation, 'id' | 'created_at'>; Update: Partial<PreferredLocation> };
-      jetties: { Row: Jetty; Insert: Omit<Jetty, 'id' | 'created_at' | 'updated_at'>; Update: Partial<Jetty> };
-      water_edges: { Row: WaterEdge; Insert: Omit<WaterEdge, 'id' | 'created_at' | 'updated_at'>; Update: Partial<WaterEdge> };
-      boats: { Row: Boat; Insert: Omit<Boat, 'id' | 'created_at' | 'updated_at'>; Update: Partial<Boat> };
-      orders: { Row: Order; Insert: Partial<Order> & { user_id: string; cargo_name: string; weight_tonnes: number; origin_address: string; origin_geog: unknown; destination_address: string; destination_geog: unknown }; Update: Partial<Order> };
-      order_legs: { Row: OrderLeg; Insert: Omit<OrderLeg, 'id' | 'created_at'>; Update: Partial<OrderLeg> };
-      jobs: { Row: Job; Insert: Partial<Job> & { order_id: string; type: JobType }; Update: Partial<Job> };
-      notifications: { Row: Notification; Insert: Omit<Notification, 'id' | 'created_at'>; Update: Partial<Notification> };
-      live_locations: { Row: LiveLocation; Insert: Omit<LiveLocation, 'id'>; Update: Partial<LiveLocation> };
-      ratings: { Row: Rating; Insert: Omit<Rating, 'id' | 'created_at'>; Update: Partial<Rating> };
-      rates: { Row: Rate; Insert: Omit<Rate, 'id' | 'updated_at'>; Update: Partial<Rate> };
-      contact_messages: { Row: ContactMessage; Insert: Omit<ContactMessage, 'id' | 'created_at'>; Update: Partial<ContactMessage> };
-      audit_log: { Row: AuditLog; Insert: Omit<AuditLog, 'id' | 'created_at'>; Update: Partial<AuditLog> };
+      profiles: { Row: Profile; Insert: Partial<Profile> & { id: string; name: string; email: string }; Update: Partial<Profile>; Relationships: [] };
+      preferred_locations: { Row: PreferredLocation; Insert: Omit<PreferredLocation, 'id' | 'created_at'>; Update: Partial<PreferredLocation>; Relationships: [] };
+      jetties: { Row: Jetty; Insert: Omit<Jetty, 'id' | 'created_at' | 'updated_at'>; Update: Partial<Jetty>; Relationships: [] };
+      water_edges: { Row: WaterEdge; Insert: Omit<WaterEdge, 'id' | 'created_at' | 'updated_at'>; Update: Partial<WaterEdge>; Relationships: [] };
+      boats: { Row: Boat; Insert: Omit<Boat, 'id' | 'created_at' | 'updated_at'>; Update: Partial<Boat>; Relationships: [] };
+      orders: { Row: Order; Insert: Partial<Order> & { user_id: string; cargo_name: string; weight_tonnes: number; origin_address: string; origin_geog: unknown; destination_address: string; destination_geog: unknown }; Update: Partial<Order>; Relationships: [] };
+      order_legs: { Row: OrderLeg; Insert: Omit<OrderLeg, 'id' | 'created_at'>; Update: Partial<OrderLeg>; Relationships: [] };
+      jobs: { Row: Job; Insert: Partial<Job> & { order_id: string; type: JobType }; Update: Partial<Job>; Relationships: [] };
+      notifications: { Row: Notification; Insert: Omit<Notification, 'id' | 'created_at'>; Update: Partial<Notification>; Relationships: [] };
+      live_locations: { Row: LiveLocation; Insert: Omit<LiveLocation, 'id'>; Update: Partial<LiveLocation>; Relationships: [] };
+      ratings: { Row: Rating; Insert: Omit<Rating, 'id' | 'created_at'>; Update: Partial<Rating>; Relationships: [] };
+      rates: { Row: Rate; Insert: Omit<Rate, 'id' | 'updated_at'>; Update: Partial<Rate>; Relationships: [] };
+      contact_messages: { Row: ContactMessage; Insert: Omit<ContactMessage, 'id' | 'created_at'>; Update: Partial<ContactMessage>; Relationships: [] };
+      audit_log: { Row: AuditLog; Insert: Omit<AuditLog, 'id' | 'created_at'>; Update: Partial<AuditLog>; Relationships: [] };
+      password_reset_otps: { Row: PasswordResetOtp; Insert: Omit<PasswordResetOtp, 'id' | 'created_at' | 'attempts'>; Update: Partial<PasswordResetOtp>; Relationships: [] };
     };
+    Views: Record<string, never>;
     Functions: {
       claim_job: { Args: { p_job_id: string }; Returns: boolean };
       is_admin: { Args: Record<string, never>; Returns: boolean };
       get_my_role: { Args: Record<string, never>; Returns: UserRole };
     };
+    Enums: {
+      user_role: UserRole;
+      vehicle_type: VehicleType;
+      order_status: OrderStatus;
+      leg_type: LegType;
+      job_type: JobType;
+      job_status: JobStatus;
+    };
+    CompositeTypes: Record<string, never>;
   };
 }
+
