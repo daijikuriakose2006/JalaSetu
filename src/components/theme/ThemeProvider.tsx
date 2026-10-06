@@ -20,17 +20,12 @@ export function useTheme() {
 }
 
 export function ThemeProvider({ children, initialTheme }: { children: React.ReactNode; initialTheme?: ThemeMode }) {
-  const [theme, setThemeState] = useState<ThemeMode>(() => {
-    if (initialTheme) return initialTheme;
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('jalasetu-theme') as ThemeMode) || 'system';
-    }
-    return 'system';
-  });
-
+  // Always initialize identically on server and client to prevent hydration mismatch
+  const [theme, setThemeState] = useState<ThemeMode>(initialTheme || 'system');
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
 
   const applyTheme = useCallback((t: ThemeMode) => {
+    if (typeof window === 'undefined') return;
     const root = document.documentElement;
     if (t === 'system') {
       root.removeAttribute('data-theme');
@@ -44,22 +39,30 @@ export function ThemeProvider({ children, initialTheme }: { children: React.Reac
 
   const setTheme = useCallback((t: ThemeMode) => {
     setThemeState(t);
-    localStorage.setItem('jalasetu-theme', t);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('jalasetu-theme', t);
+    }
     applyTheme(t);
   }, [applyTheme]);
 
+  // Read localStorage and apply theme only after mounting on client
   useEffect(() => {
-    applyTheme(theme);
+    const saved = localStorage.getItem('jalasetu-theme') as ThemeMode;
+    const activeTheme = saved && ['light', 'dark', 'system'].includes(saved) ? saved : theme;
+    if (saved) {
+      setThemeState(saved);
+    }
+    applyTheme(activeTheme);
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
-      if (theme === 'system') {
+      if (activeTheme === 'system') {
         setResolvedTheme(mediaQuery.matches ? 'dark' : 'light');
       }
     };
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [theme, applyTheme]);
+  }, [applyTheme]);
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, resolvedTheme }}>
