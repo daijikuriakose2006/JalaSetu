@@ -6,6 +6,7 @@ import type { Order, OrderLeg, Jetty, WaterEdge } from '@/lib/types/database';
 
 export async function GET(request: Request) {
   try {
+    // Auth check with user-scoped client
     const supabase = await createClient();
     const {
       data: { user },
@@ -19,13 +20,24 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
 
-    let query = supabase.from('orders').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+    // Use admin client to bypass the recursive RLS policy on orders table
+    // We enforce the user filter manually in code
+    const admin = createAdminClient();
+    let query = admin
+      .from('orders')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
     if (status && status !== 'all') {
       query = query.eq('status', status as any);
     }
 
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) {
+      console.error('GET /api/orders error:', error.message);
+      throw error;
+    }
 
     return NextResponse.json({ orders: data || [] });
   } catch (error: any) {
@@ -75,6 +87,12 @@ export async function POST(request: Request) {
     const destLat = dest_coords?.[0] || 9.4981;
     const destLng = dest_coords?.[1] || 76.3388;
 
+    console.log('\n──── POST /api/orders ─────────────────────────────');
+    console.log('👤 User:', user.id);
+    console.log('📦 Cargo:', cargo_name, weight_tonnes + 't');
+    console.log('🗺️  Route:', origin_address, '→', destination_address);
+    console.log('🔗 Legs to insert:', legs?.length || 0);
+
     // Use admin client to insert order with geography points
     const { data: order, error: orderError } = await admin
       .from('orders')
@@ -110,7 +128,11 @@ export async function POST(request: Request) {
       .select()
       .single();
 
-    if (orderError) throw orderError;
+    if (orderError) {
+      console.error('❌ Order insert error:', orderError.message, orderError.code);
+      throw orderError;
+    }
+    console.log('✅ Order created:', order.id);
 
     // Insert order legs
     const insertedLegs: OrderLeg[] = [];
@@ -148,18 +170,24 @@ export async function POST(request: Request) {
       }
     }
 
-    // Trigger matching and dispatch
-    const [{ data: jetties }, { data: waterEdges }] = await Promise.all([
-      admin.from('jetties').select('*'),
-      admin.from('water_edges').select('*'),
-    ]);
+    // Trigger matching and dispatch — wrapped separately so a dispatch error
+    // does NOT roll back the already-created order
+    try {
+      const [{ data: jetties }, { data: waterEdges }] = await Promise.all([
+        admin.from('jetties').select('*'),
+        admin.from('water_edges').select('*'),
+      ]);
 
-    await dispatchOrder({
-      order: order as Order,
-      legs: insertedLegs,
-      jetties: (jetties as Jetty[]) || [],
-      edges: (waterEdges as WaterEdge[]) || [],
-    });
+      await dispatchOrder({
+        order: order as Order,
+        legs: insertedLegs,
+        jetties: (jetties as Jetty[]) || [],
+        edges: (waterEdges as WaterEdge[]) || [],
+      });
+    } catch (dispatchErr: any) {
+      // Log but don't fail — the order is saved, dispatch can be retried
+      console.error('Dispatch error (order still saved):', dispatchErr?.message || dispatchErr);
+    }
 
     return NextResponse.json({ order, legs: insertedLegs }, { status: 201 });
   } catch (error: any) {
