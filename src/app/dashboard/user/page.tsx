@@ -365,20 +365,20 @@ export default function UserDashboard() {
             {/* Map Legend */}
             <div className="flex flex-wrap items-center gap-4 pt-1 text-[11px] text-secondary">
               <div className="flex items-center gap-1.5">
-                <span className="w-3 h-1 bg-[#3F7F83] rounded"></span>
-                <span>Water Barge Leg</span>
+                <span className="w-3.5 h-1.5 bg-[#0284c7] rounded-sm shadow-sm"></span>
+                <span className="font-semibold text-primary">🚢 Waterway Barge Leg</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-3 h-1 border-t-2 border-dashed border-[#2980B9]"></span>
+                <span className="w-3.5 h-0.5 border-t-2 border-dashed border-[#3b82f6]"></span>
                 <span>First-Mile Taxi</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-3 h-1 border-t-2 border-dashed border-[#E67E22]"></span>
+                <span className="w-3.5 h-0.5 border-t-2 border-dashed border-[#f97316]"></span>
                 <span>Last-Mile Taxi</span>
               </div>
               <div className="flex items-center gap-1">
                 <span>⚓</span>
-                <span>Jetty</span>
+                <span>Boarding / Landing Jetty</span>
               </div>
             </div>
           </div>

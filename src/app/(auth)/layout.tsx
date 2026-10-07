@@ -1,12 +1,18 @@
-'use client';
-
+import Link from 'next/link';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-main flex items-center justify-center p-4 relative">
-      {/* Theme toggle — top left */}
-      <div className="absolute top-4 left-4 z-10">
+      {/* Top bar — Back to home and Theme toggle */}
+      <div className="absolute top-4 left-4 z-10 flex items-center gap-2.5">
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface border border-default text-secondary hover:text-accent hover:border-accent transition-all shadow-sm"
+        >
+          <span>←</span>
+          <span>Home</span>
+        </Link>
         <ThemeToggle />
       </div>
 

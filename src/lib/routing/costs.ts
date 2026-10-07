@@ -13,9 +13,13 @@ export const DEFAULT_RATES: RateMap = {
   taxi_per_km_truck: 35,
   taxi_base_fare_trailer: 250,
   taxi_per_km_trailer: 45,
+  // Water: ₹3.5/tonne-km (cheap bulk transport) + ₹220 minimum booking charge
   water_cost_per_tonne_km: 3.5,
   water_loading_charge_per_tonne: 150,
-  road_cost_per_tonne_km: 6.0,
+  water_min_booking_charge: 220,      // minimum barge booking regardless of cargo size
+  // Road: ₹10/tonne-km for trucks (Kerala highway rates), min ₹450 booking
+  road_cost_per_tonne_km: 10,
+  road_min_booking_charge: 450,
   co2_road_per_tonne_km: 0.062,
   co2_water_per_tonne_km: 0.016,
   co2_taxi_per_km: 0.12,
@@ -87,12 +91,13 @@ export function calculateDirectRoadCost(
 ): number {
   if (distanceKm <= 0) return 0;
   const ratePerTonneKm = rates['road_cost_per_tonne_km'] ?? DEFAULT_RATES['road_cost_per_tonne_km'];
-  // Minimum base logistics fee of 400
-  return Math.round(Math.max(400, ratePerTonneKm * distanceKm * weightTonnes));
+  const minCharge      = rates['road_min_booking_charge'] ?? DEFAULT_RATES['road_min_booking_charge'] ?? 450;
+  return Math.round(Math.max(minCharge, ratePerTonneKm * distanceKm * weightTonnes));
 }
 
 /**
- * Calculate water leg freight cost
+ * Calculate water leg freight cost (barge)
+ * Includes a minimum booking charge so small cargo is still priced realistically.
  */
 export function calculateWaterCost(
   distanceKm: number,
@@ -101,7 +106,8 @@ export function calculateWaterCost(
 ): number {
   if (distanceKm <= 0) return 0;
   const ratePerTonneKm = rates['water_cost_per_tonne_km'] ?? DEFAULT_RATES['water_cost_per_tonne_km'];
-  return Math.round(ratePerTonneKm * distanceKm * weightTonnes);
+  const minCharge      = rates['water_min_booking_charge'] ?? DEFAULT_RATES['water_min_booking_charge'] ?? 220;
+  return Math.round(Math.max(minCharge, ratePerTonneKm * distanceKm * weightTonnes));
 }
 
 /**
@@ -127,16 +133,20 @@ export function calculateCO2(
   if (distanceKm <= 0) return 0;
 
   if (mode === 'road_direct') {
-    const factor = rates['co2_road_per_tonne_km'] ?? DEFAULT_RATES['co2_road_per_tonne_km'];
-    return Number((factor * distanceKm * weightTonnes).toFixed(1));
+    const factor = rates['co2_road_per_tonne_km'] ?? DEFAULT_RATES['co2_road_per_tonne_km'] ?? 0.062;
+    // Dedicated road highway truck baseline (fuel consumption + weight factor)
+    const baseline = Number((0.18 * distanceKm).toFixed(1));
+    const byWeight = Number((factor * distanceKm * weightTonnes).toFixed(1));
+    return Math.max(baseline, byWeight);
   }
 
   if (mode === 'water') {
-    const factor = rates['co2_water_per_tonne_km'] ?? DEFAULT_RATES['co2_water_per_tonne_km'];
-    return Number((factor * distanceKm * weightTonnes).toFixed(1));
+    const factor = rates['co2_water_per_tonne_km'] ?? DEFAULT_RATES['co2_water_per_tonne_km'] ?? 0.016;
+    return Number((factor * distanceKm * Math.max(0.05, weightTonnes)).toFixed(1));
   }
 
-  // Taxi leg
-  const factor = rates['co2_taxi_per_km'] ?? DEFAULT_RATES['co2_taxi_per_km'];
-  return Number((factor * distanceKm).toFixed(1));
+  // Taxi leg (first / last mile): prorated by cargo payload share
+  const factor = rates['co2_taxi_per_km'] ?? DEFAULT_RATES['co2_taxi_per_km'] ?? 0.12;
+  const cargoShare = Math.min(1, Math.max(0.15, weightTonnes / 1.5));
+  return Number((factor * distanceKm * cargoShare).toFixed(1));
 }

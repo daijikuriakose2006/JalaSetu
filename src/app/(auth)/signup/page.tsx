@@ -86,11 +86,22 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="card bg-surface p-6 rounded-xl shadow-sm border border-default max-w-md mx-auto my-8">
-      <h2 className="text-xl font-semibold mb-2 text-center text-primary">Create an account</h2>
-      <p className="text-xs text-secondary text-center mb-6">
-        Join Kerala&apos;s Inland Water Transport Network
-      </p>
+    <div>
+      <div className="mb-3">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-xs text-secondary hover:text-accent font-medium transition-colors"
+        >
+          <span>←</span>
+          <span>Back to Home</span>
+        </Link>
+      </div>
+
+      <div className="card bg-surface p-6 rounded-xl shadow-sm border border-default">
+        <h2 className="text-xl font-semibold mb-2 text-center text-primary">Create an account</h2>
+        <p className="text-xs text-secondary text-center mb-6">
+          Join Kerala&apos;s Inland Water Transport Network
+        </p>
 
       {error && (
         <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 rounded-lg text-sm error-text">
@@ -280,6 +291,7 @@ export default function SignupPage() {
           </Link>
         </div>
       </form>
+      </div>
     </div>
   );
 }

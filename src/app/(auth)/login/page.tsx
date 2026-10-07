@@ -64,8 +64,19 @@ export default function LoginPage() {
   ];
 
   return (
-    <div className="card bg-surface p-6 rounded-xl shadow-sm border border-default">
-      <h2 className="text-xl font-semibold mb-6 text-center">Login to your account</h2>
+    <div>
+      <div className="mb-3">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-xs text-secondary hover:text-accent font-medium transition-colors"
+        >
+          <span>←</span>
+          <span>Back to Home</span>
+        </Link>
+      </div>
+
+      <div className="card bg-surface p-6 rounded-xl shadow-sm border border-default">
+        <h2 className="text-xl font-semibold mb-6 text-center text-primary">Login to your account</h2>
       
       {error && (
         <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm error-text">
@@ -168,6 +179,7 @@ export default function LoginPage() {
           </Link>
         </div>
       </form>
+      </div>
     </div>
   );
 }

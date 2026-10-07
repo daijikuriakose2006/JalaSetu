@@ -105,9 +105,16 @@ export default function RouteMap({
       }
     }
 
-    // ── 2. Route legs — drawn BEFORE markers so pins sit on top ─────────
+    // ── 2. Route legs — draw road legs first, water leg on top ───────────
     if (legs && legs.length > 0) {
-      for (const leg of legs) {
+      // Sort legs so road legs are drawn first and water leg sits prominently on top
+      const sortedLegs = [...legs].sort((a, b) => {
+        if (a.leg_type === 'water') return 1;
+        if (b.leg_type === 'water') return -1;
+        return 0;
+      });
+
+      for (const leg of sortedLegs) {
         if (!leg.geometry?.coordinates) continue;
 
         const latLngs: [number, number][] = leg.geometry.coordinates.map(
@@ -118,27 +125,27 @@ export default function RouteMap({
         // Leg style
         let color = '#3F7F83';
         let dashArray: string | undefined;
-        let weight = 7;
+        let weight = 6;
         let glowColor = 'rgba(63,127,131,0.25)';
         let label = '';
 
         if (leg.leg_type === 'water') {
-          color = '#1a9ea6';
-          weight = 7;
-          glowColor = 'rgba(26,158,166,0.3)';
-          label = `🚢 Water: ${leg.from_name} → ${leg.to_name}`;
+          color = '#0284c7'; // Vivid oceanic water blue
+          weight = 8;
+          glowColor = 'rgba(2,132,199,0.4)';
+          label = `🚢 Waterway Barge: ${leg.from_name} → ${leg.to_name}`;
         } else if (leg.leg_type === 'road_origin') {
-          color = '#2563eb';
-          dashArray = '10, 6';
+          color = '#3b82f6';
+          dashArray = '8, 6';
           weight = 5;
-          glowColor = 'rgba(37,99,235,0.25)';
-          label = `🚛 Pickup: ${leg.from_name} → ${leg.to_name}`;
+          glowColor = 'rgba(59,130,246,0.25)';
+          label = `🚛 First-Mile Road Pickup: ${leg.from_name} → ${leg.to_name}`;
         } else if (leg.leg_type === 'road_destination') {
-          color = '#ea580c';
-          dashArray = '10, 6';
+          color = '#f97316';
+          dashArray = '8, 6';
           weight = 5;
-          glowColor = 'rgba(234,88,12,0.25)';
-          label = `🚛 Delivery: ${leg.from_name} → ${leg.to_name}`;
+          glowColor = 'rgba(249,115,22,0.25)';
+          label = `🚛 Last-Mile Road Delivery: ${leg.from_name} → ${leg.to_name}`;
         }
 
         // Glow shadow layer (drawn first, wider, semi-transparent)
@@ -155,21 +162,62 @@ export default function RouteMap({
         const polyline = L.polyline(latLngs, {
           color,
           weight,
-          opacity: 0.92,
+          opacity: 0.95,
           dashArray,
           lineCap: 'round',
           lineJoin: 'round',
         }).bindPopup(
-          `<div style="min-width:160px">
+          `<div style="min-width:180px">
             <strong>${label}</strong><br/>
-            <span style="color:#555">Distance: ${leg.distance_km} km</span><br/>
+            <span style="color:#555">Distance: <strong>${leg.distance_km} km</strong></span><br/>
             <span style="color:#555">Duration: ~${leg.duration_min} min</span>
           </div>`
         );
         layerGroup.addLayer(polyline);
 
-        // Animated arrow/direction markers along the route
-        if (latLngs.length > 1) {
+        // For water leg, add prominent midpoint badge
+        if (leg.leg_type === 'water' && latLngs.length > 1) {
+          const midIdx = Math.floor(latLngs.length / 2);
+          const midPt = latLngs[midIdx];
+
+          const badgeIcon = L.divIcon({
+            className: '',
+            html: `<div style="
+              background: #0284c7;
+              color: white;
+              padding: 3px 8px;
+              border-radius: 9999px;
+              font-size: 11px;
+              font-weight: bold;
+              white-space: nowrap;
+              box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+              border: 1.5px solid white;
+              display: flex;
+              align-items: center;
+              gap: 4px;
+            ">🚢 Waterway (${leg.distance_km} km)</div>`,
+            iconSize: [140, 24],
+            iconAnchor: [70, 12],
+          });
+          L.marker(midPt, { icon: badgeIcon, interactive: false }).addTo(layerGroup);
+
+          // Add jetty anchor pins at boarding and landing points
+          if (latLngs.length > 0) {
+            const boardingPt = latLngs[0];
+            const landingPt = latLngs[latLngs.length - 1];
+
+            const boardingIcon = createEmojiIcon('⚓', '#0369a1');
+            L.marker(boardingPt, { icon: boardingIcon })
+              .bindPopup(`<strong>⚓ Boarding Jetty:</strong> ${leg.from_name}`)
+              .addTo(layerGroup);
+
+            const landingIcon = createEmojiIcon('⚓', '#0369a1');
+            L.marker(landingPt, { icon: landingIcon })
+              .bindPopup(`<strong>⚓ Landing Jetty:</strong> ${leg.to_name}`)
+              .addTo(layerGroup);
+          }
+        } else if (latLngs.length > 1) {
+          // Direction arrow on road legs
           const midIdx = Math.floor(latLngs.length / 2);
           const midPt = latLngs[midIdx];
           const prevPt = latLngs[Math.max(0, midIdx - 1)];
@@ -182,14 +230,14 @@ export default function RouteMap({
             className: '',
             html: `<div style="
               color:${color};
-              font-size:18px;
+              font-size:16px;
               font-weight:bold;
               transform:rotate(${angle}deg);
-              text-shadow:0 0 4px white, 0 0 4px white;
+              text-shadow:0 0 3px white, 0 0 3px white;
               line-height:1;
             ">›</div>`,
-            iconSize: [18, 18],
-            iconAnchor: [9, 9],
+            iconSize: [16, 16],
+            iconAnchor: [8, 8],
           });
           L.marker(midPt, { icon: arrowIcon, interactive: false }).addTo(layerGroup);
         }
