@@ -19,13 +19,12 @@ const ChatRequestSchema = z.object({
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    let userId: string | null = null;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || null;
+    } catch {
+      // Non-blocking for conversation
     }
 
     const body = await request.json();
@@ -36,14 +35,27 @@ export async function POST(request: Request) {
 
     const { message, chat_history = [] } = parsed.data;
 
-    // Use centralized Gemini extraction with fallback
+    // 🔍 Debug: log what is being sent to the model
+    console.log('\n──── /api/chat ────────────────────────────────────');
+    console.log('📨 User message:', message);
+    console.log('📜 History length:', chat_history.length);
+
+    // Use centralized Gemini extraction with intelligent fallback
     const result = await extractBookingDetails(chat_history, message);
+
+    // 🔍 Debug: log what came back
+    console.log('🤖 Reply:', result.reply.slice(0, 80) + (result.reply.length > 80 ? '…' : ''));
+    console.log('📦 Extracted:', JSON.stringify(result.extracted));
+    console.log('✅ is_complete:', result.is_complete);
+    console.log('────────────────────────────────────────────────────\n');
 
     return NextResponse.json({
       reply: result.reply,
       extracted_data: result.extracted,
       is_complete: result.is_complete,
+      suggested_chips: result.suggested_chips || [],
       order_id: parsed.data.order_id,
+      user_id: userId,
     });
   } catch (err: any) {
     console.error('Chat endpoint error:', err);

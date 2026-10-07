@@ -211,6 +211,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  suggested_chips?: string[];
+  is_booking_summary?: boolean;
 }
 
 export interface StatusChange {
