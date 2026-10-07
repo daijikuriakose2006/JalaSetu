@@ -21,47 +21,33 @@ export function useTheme() {
 
 export function ThemeProvider({ children, initialTheme }: { children: React.ReactNode; initialTheme?: ThemeMode }) {
   // Always initialize identically on server and client to prevent hydration mismatch
-  const [theme, setThemeState] = useState<ThemeMode>(initialTheme || 'system');
+  const [theme, setThemeState] = useState<ThemeMode>(initialTheme || 'light');
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
 
   const applyTheme = useCallback((t: ThemeMode) => {
     if (typeof window === 'undefined') return;
     const root = document.documentElement;
-    if (t === 'system') {
-      root.removeAttribute('data-theme');
-      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setResolvedTheme(isDark ? 'dark' : 'light');
-    } else {
-      root.setAttribute('data-theme', t);
-      setResolvedTheme(t);
-    }
+    const resolved: 'light' | 'dark' = t === 'dark' ? 'dark' : 'light';
+    root.setAttribute('data-theme', resolved);
+    setResolvedTheme(resolved);
   }, []);
 
   const setTheme = useCallback((t: ThemeMode) => {
-    setThemeState(t);
+    const safe: ThemeMode = t === 'dark' ? 'dark' : 'light';
+    setThemeState(safe);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('jalasetu-theme', t);
+      localStorage.setItem('jalasetu-theme', safe);
     }
-    applyTheme(t);
+    applyTheme(safe);
   }, [applyTheme]);
 
   // Read localStorage and apply theme only after mounting on client
   useEffect(() => {
     const saved = localStorage.getItem('jalasetu-theme') as ThemeMode;
-    const activeTheme = saved && ['light', 'dark', 'system'].includes(saved) ? saved : theme;
-    if (saved) {
-      setThemeState(saved);
-    }
+    // Only accept 'light' or 'dark' — ignore 'system' (legacy)
+    const activeTheme: ThemeMode = saved === 'dark' ? 'dark' : 'light';
+    setThemeState(activeTheme);
     applyTheme(activeTheme);
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = () => {
-      if (activeTheme === 'system') {
-        setResolvedTheme(mediaQuery.matches ? 'dark' : 'light');
-      }
-    };
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
   }, [applyTheme]);
 
   return (

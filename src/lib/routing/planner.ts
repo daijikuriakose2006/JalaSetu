@@ -1,6 +1,7 @@
 import type { Jetty, WaterEdge, VehicleType } from '@/lib/types/database';
 import { findNearestJetty, findWaterRoute, getJettyCoords } from './dijkstra';
 import { getRoadRoute, type RoadRouteResult } from './road';
+import { getWaterwayGeometry } from './waterway-geometry';
 import {
   calculateRoadLegCost,
   calculateDirectRoadCost,
@@ -132,9 +133,14 @@ export async function planMultiLegRoute(
     });
   }
 
-  // 4. Water Leg
-  // Build line geometry from Dijkstra path nodes
-  const waterCoords: [number, number][] = waterRoute.path.map((n) => [n.lng, n.lat]);
+  // 4. Water Leg — use real backwater canal geometry instead of straight lines
+  const waterCoords = getWaterwayGeometry(
+    originJettyCoords.lat,
+    originJettyCoords.lng,
+    destJettyCoords.lat,
+    destJettyCoords.lng,
+    waterRoute.path  // Dijkstra path nodes used to stitch multi-hop geometry
+  );
   const waterFreightCost = calculateWaterCost(waterRoute.totalDistanceKm, weightTonnes, rates);
   const loadingCost = needsLoadingUnloading ? calculateLoadingCharge(weightTonnes, rates) * 2 : 0; // load + unload
   const totalWaterLegCost = waterFreightCost + loadingCost;
