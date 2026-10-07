@@ -49,12 +49,22 @@ export function extractBookingFallback(
   chatHistory: { role: 'user' | 'assistant'; content: string }[],
   latestMessage: string
 ): ChatExtractionResult {
+  // Normalize arrow symbols → / -> / --> to " to " before any pattern matching
+  const normalizedMessage = latestMessage
+    .replace(/→|->|-->/g, ' to ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const normalizedHistory = chatHistory.map((m) => ({
+    ...m,
+    content: m.content.replace(/→|->|-->/g, ' to '),
+  }));
+
   // Scan the FULL conversation to build up extracted fields progressively
-  const fullText = chatHistory.map((m) => m.content).join(' ') + ' ' + latestMessage;
+  const fullText = normalizedHistory.map((m) => m.content).join(' ') + ' ' + normalizedMessage;
   const lower = fullText.toLowerCase();
 
   // ONLY scan LATEST message for greeting detection (not history)
-  const latestLower = latestMessage.toLowerCase().trim();
+  const latestLower = normalizedMessage.toLowerCase().trim();
   const isGreeting =
     latestMessage.trim().length < 20 &&
     (latestLower === 'hi' ||
@@ -150,8 +160,10 @@ export function extractBookingFallback(
     nedumudi: 'Nedumudi',
   };
 
-  // "from <city>" pattern
-  const fromMatch = lower.match(/(?:from|pickup\s+at|starting\s+(?:from|at)|origin\s*:?)\s+([a-z\s]{3,25}?)(?:\s+to|\s+for|\s+dest|,|$)/i);
+  // "from <city>" pattern — stops at "to", comma, number, or end-of-string
+  const fromMatch = lower.match(
+    /(?:from|pickup\s+at|starting\s+(?:from|at)|origin\s*:?)\s+([a-z][a-z\s]{1,22}?)(?=\s+to\b|\s+for\b|\s+dest|\s*,|\s*\d|\s*$)/i
+  );
   if (fromMatch) {
     const candidate = fromMatch[1].trim().toLowerCase();
     for (const [key, val] of Object.entries(KERALA_CITIES)) {
@@ -160,28 +172,44 @@ export function extractBookingFallback(
     if (!extracted.origin && candidate.length > 2) extracted.origin = fromMatch[1].trim();
   }
 
-  // "to <city>" pattern
-  const toMatch = lower.match(/(?:\bto\b|delivery\s+to|dest(?:ination)?\s*:?)\s+([a-z\s]{3,25?})(?:\s+with|\s+for|\s+by|,|$)/i);
+  // "to <city>" pattern — stops at a number, keyword, comma, or end-of-string
+  // Uses word boundary lookahead so "to transfer wood" doesn't match "transfer" as a city
+  const toMatch = lower.match(
+    /(?:delivery\s+to|dest(?:ination)?\s*:?|\bto\b)\s+([a-z][a-z\s]{1,22}?)(?=\s+(?:with|for|by|\d)|\s*,|\s*$)/i
+  );
   if (toMatch) {
     const candidate = toMatch[1].trim().toLowerCase();
+    // Only accept if the captured text contains a known Kerala city
     for (const [key, val] of Object.entries(KERALA_CITIES)) {
       if (candidate.includes(key)) { extracted.destination = val; break; }
     }
-    if (!extracted.destination && candidate.length > 2) extracted.destination = toMatch[1].trim();
+    // Raw string only if it looks like a city (no verb words)
+    const verbs = /\b(transfer|transport|move|send|ship|carry|need|want|have|from|pickup)\b/i;
+    if (!extracted.destination && candidate.length > 2 && !verbs.test(candidate)) {
+      extracted.destination = toMatch[1].trim();
+    }
   }
 
-  // Fallback: city mentioned anywhere in text — only with directional context
+  // Fallback: direct "to <city>" — at most 2 words between "to" and the city name
+  // This avoids "need to transfer wood from ernakulam" matching ernakulam as destination
   if (!extracted.origin) {
     for (const [key, val] of Object.entries(KERALA_CITIES)) {
-      if (lower.match(new RegExp(`\\b(from|pickup)\\b[^.]*\\b${key}\\b`, 'i'))) {
+      if (lower.match(new RegExp(`\\bfrom\\s+(?:[a-z]+\\s+){0,2}\\b${key}\\b`, 'i'))) {
         extracted.origin = val; break;
       }
     }
   }
   if (!extracted.destination) {
     for (const [key, val] of Object.entries(KERALA_CITIES)) {
-      if (lower.match(new RegExp(`\\b(to|deliver(?:y|ed)?\\s+(?:to)?)\\b[^.]*\\b${key}\\b`, 'i'))) {
-        extracted.destination = val; break;
+      // Max 2 filler words between "to" and the city; prevents "to transfer wood from ernakulam"
+      if (lower.match(new RegExp(`\\bto\\s+(?:[a-z]+\\s+){0,2}\\b${key}\\b`, 'i'))) {
+        // Extra guard: ensure "from" doesn't appear between "to" and this city match
+        const toIdx  = lower.lastIndexOf(' to ');
+        const cityIdx = lower.lastIndexOf(key);
+        const fromIdx = lower.indexOf(' from ', toIdx);
+        if (cityIdx > toIdx && (fromIdx === -1 || fromIdx > cityIdx)) {
+          extracted.destination = val; break;
+        }
       }
     }
   }
@@ -276,12 +304,14 @@ Rules:
 - Be warm and friendly, use Kerala context in replies.
 - Always output valid JSON conforming to the schema.`;
 
+  // Normalize arrows in history and message before sending to Gemini
+  const normalizeForGemini = (s: string) => s.replace(/→|->|-->/g, ' to ').replace(/\s+/g, ' ').trim();
   const conversationText = chatHistory
-    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-    .join('\n') + `\nUSER: ${latestMessage}`;
+    .map((m) => `${m.role.toUpperCase()}: ${normalizeForGemini(m.content)}`)
+    .join('\n') + `\nUSER: ${normalizeForGemini(latestMessage)}`;
 
   try {
-    const response = await ai.models.generateContent({
+    const geminiCall = ai.models.generateContent({
       model: modelName,
       contents: conversationText,
       config: {
@@ -313,6 +343,13 @@ Rules:
         },
       },
     });
+
+    // 7-second hard timeout — never hang the chat UI
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Gemini timeout after 7s')), 7000)
+    );
+
+    const response = await Promise.race([geminiCall, timeoutPromise]);
 
     const parsed = JSON.parse(response.text || '{}');
     if (parsed.reply) {

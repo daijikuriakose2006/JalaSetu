@@ -25,7 +25,7 @@ export async function getRouteOSRM(
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000);
+    const timeout = setTimeout(() => controller.abort(), 3000); // 3s — fail fast to fallback
 
     const res = await fetch(url, {
       signal: controller.signal,

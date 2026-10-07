@@ -99,23 +99,27 @@ export async function planMultiLegRoute(
   const destVehicle = recommendVehicleType(weightTonnes);
   const boatRecommendation = recommendBoatType(weightTonnes, cargoType);
 
+  // 3-6. Fetch all road routes IN PARALLEL to avoid sequential OSRM delays
+  const needsOriginRoad = nearestOrigin.distanceKm > 0.5;
+  const needsDestRoad   = nearestDest.distanceKm > 0.5;
+
+  const [originRoadResult, destRoadResult, directRoad] = await Promise.all([
+    needsOriginRoad
+      ? getRoadRoute(origin.lat, origin.lng, originJettyCoords.lat, originJettyCoords.lng)
+      : Promise.resolve(null as any),
+    needsDestRoad
+      ? getRoadRoute(destJettyCoords.lat, destJettyCoords.lng, destination.lat, destination.lng)
+      : Promise.resolve(null as any),
+    getRoadRoute(origin.lat, origin.lng, destination.lat, destination.lng),
+  ]);
+
   const legs: PlannedLeg[] = [];
   let seq = 1;
 
-  // 3. Road Origin Leg (if origin is > 500m from origin jetty)
-  const originJettyDistDirect = nearestOrigin.distanceKm;
-  let originRoadResult: RoadRouteResult | null = null;
-
-  if (originJettyDistDirect > 0.5) {
-    originRoadResult = await getRoadRoute(
-      origin.lat,
-      origin.lng,
-      originJettyCoords.lat,
-      originJettyCoords.lng
-    );
+  // Build legs array from parallel results
+  if (needsOriginRoad && originRoadResult) {
     const cost = calculateRoadLegCost(originRoadResult.distance_km, originVehicle, rates);
-    const co2 = calculateCO2(originRoadResult.distance_km, weightTonnes, 'road_taxi', rates);
-
+    const co2  = calculateCO2(originRoadResult.distance_km, weightTonnes, 'road_taxi', rates);
     legs.push({
       leg_type: 'road_origin',
       sequence_num: seq++,
@@ -133,13 +137,13 @@ export async function planMultiLegRoute(
     });
   }
 
-  // 4. Water Leg — use real backwater canal geometry instead of straight lines
+  // Water leg (already computed above — real backwater geometry)
   const waterCoords = getWaterwayGeometry(
     originJettyCoords.lat,
     originJettyCoords.lng,
     destJettyCoords.lat,
     destJettyCoords.lng,
-    waterRoute.path  // Dijkstra path nodes used to stitch multi-hop geometry
+    waterRoute.path
   );
   const waterFreightCost = calculateWaterCost(waterRoute.totalDistanceKm, weightTonnes, rates);
   const loadingCost = needsLoadingUnloading ? calculateLoadingCharge(weightTonnes, rates) * 2 : 0; // load + unload
@@ -165,20 +169,10 @@ export async function planMultiLegRoute(
     to_jetty_id: destJetty.id,
   });
 
-  // 5. Road Destination Leg (if destination is > 500m from dest jetty)
-  const destJettyDistDirect = nearestDest.distanceKm;
-  let destRoadResult: RoadRouteResult | null = null;
-
-  if (destJettyDistDirect > 0.5) {
-    destRoadResult = await getRoadRoute(
-      destJettyCoords.lat,
-      destJettyCoords.lng,
-      destination.lat,
-      destination.lng
-    );
+  // Destination road leg (result already fetched in parallel above)
+  if (needsDestRoad && destRoadResult) {
     const cost = calculateRoadLegCost(destRoadResult.distance_km, destVehicle, rates);
-    const co2 = calculateCO2(destRoadResult.distance_km, weightTonnes, 'road_taxi', rates);
-
+    const co2  = calculateCO2(destRoadResult.distance_km, weightTonnes, 'road_taxi', rates);
     legs.push({
       leg_type: 'road_destination',
       sequence_num: seq++,
@@ -196,15 +190,9 @@ export async function planMultiLegRoute(
     });
   }
 
-  // 6. Direct Road Route for Comparison
-  const directRoad = await getRoadRoute(
-    origin.lat,
-    origin.lng,
-    destination.lat,
-    destination.lng
-  );
+  // Direct road comparison (also fetched in parallel above)
   const directRoadCost = calculateDirectRoadCost(directRoad.distance_km, weightTonnes, rates);
-  const directRoadCO2 = calculateCO2(directRoad.distance_km, weightTonnes, 'road_direct', rates);
+  const directRoadCO2  = calculateCO2(directRoad.distance_km, weightTonnes, 'road_direct', rates);
 
   // 7. Sum up water multi-modal plan
   const totalWaterDistance = Number(legs.reduce((acc, l) => acc + l.distance_km, 0).toFixed(1));
