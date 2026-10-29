@@ -1,4 +1,4 @@
-# 🚢 JalaSetu (जलसेतु) — Kerala Inland Waterway Freight Marketplace
+# 🚢 JalaSetu — Kerala Inland Waterway Freight Marketplace
 
 > A multi-modal logistics platform connecting cargo owners with inland water transport along Kerala's 1,687 km navigable waterways (National Waterway 3 / NW-3), integrated with first- and last-mile road transport (taxis/trucks) and jetty stevedores.
 
